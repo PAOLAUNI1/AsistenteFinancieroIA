@@ -1,12 +1,13 @@
-# GEMINI.md --- Contexto completo del proyecto IA Financiera
+# CLAUDE.md --- Contexto completo del proyecto IA Financiera
 
 ## Propósito
 
 Este documento reúne el contexto funcional, académico y técnico del
 proyecto **IA Financiera / Asistente Financiero Inteligente** para que
-Gemini pueda continuar el desarrollo sin perder decisiones ya tomadas.
+el asistente de IA (actualmente Claude Code) pueda continuar el
+desarrollo sin perder decisiones ya tomadas.
 
-### Reglas para Gemini
+### Reglas para el asistente
 
 -   No reinventar decisiones funcionales ya tomadas sin indicación
     explícita.
@@ -79,6 +80,7 @@ IA_FINANCIERA/
 ├── dataset.csv
 ├── modelo.py
 ├── recomendaciones.py
+├── utils.py
 └── deudas/
     ├── __init__.py
     ├── consumo.py
@@ -89,6 +91,10 @@ IA_FINANCIERA/
     ├── tarjeta.py
     └── vehiculo.py
 ```
+
+`utils.py` contiene las funciones de formato/parseo monetario descritas
+en la sección 11 (`campo_moneda`, `campo_moneda_decimal`,
+`limpiar_moneda`, `limpiar_moneda_decimal`, `mostrar_moneda`).
 
 Para ejecutar localmente, preferir:
 
@@ -813,15 +819,15 @@ la arquitectura final Android.
 
 Seguir este orden:
 
-1.  Estabilizar estructura base.
-2.  Completar crédito hipotecario.
-3.  Completar tarjeta de crédito.
-4.  Completar crédito de vehículo.
-5.  Completar crédito educativo.
-6.  Completar préstamo de libre inversión.
-7.  Completar préstamo personal.
-8.  Completar crédito de consumo.
-9.  Centralizar Mis deudas.
+1.  ✅ Estabilizar estructura base.
+2.  ✅ Completar crédito hipotecario.
+3.  ✅ Completar tarjeta de crédito.
+4.  ✅ Completar crédito de vehículo.
+5.  ✅ Completar crédito educativo.
+6.  ✅ Completar préstamo de libre inversión.
+7.  ✅ Completar préstamo personal.
+8.  ✅ Completar crédito de consumo.
+9.  ⏳ Centralizar Mis deudas. **(paso actual)**
 10. Persistencia.
 11. Registro de pagos y movimientos.
 12. Cálculo de endeudamiento.
@@ -979,26 +985,29 @@ No debe quedar como una simple interfaz de formularios.
 
 # 38. Próximo paso inmediato
 
-El **crédito hipotecario ya está funcionando como primer formulario**.
+Los **siete formularios de deuda ya están implementados** (hipotecario,
+tarjeta, vehículo, educativo, libre inversión, préstamo personal y
+consumo), cada uno en su propio módulo dentro de `deudas/` y
+registrados en `deudas/__init__.py` mediante `TIPOS_DEUDAS`.
 
-El siguiente trabajo es implementar:
+Pendiente dentro de tarjeta de crédito: el flujo de "agregar compra
+asociada a una tarjeta existente" (sección 16) y el manejo del ciclo de
+facturación según corte/pago (sección 18) aún no están confirmados como
+completos; verificar antes de darlos por cerrados.
 
-## Tarjeta de crédito
+El siguiente trabajo según el orden de la sección 32 es:
 
-Respetar las decisiones ya tomadas:
+## Centralizar "Mis deudas"
 
--   cupo;
--   deuda;
--   tasa;
--   cuotas;
--   fecha de corte;
--   fecha de pago;
--   nuevas compras asociadas a una tarjeta existente;
--   ciclo de facturación;
--   control del saldo;
--   condiciones de intereses.
+-   Unificar la presentación de los siete tipos de deuda en una sola
+    sección `Mis deudas` (ver formato de ejemplo en la sección 12).
+-   Reutilizar los datos ya guardados en `st.session_state.deudas` sin
+    duplicar lógica de formato entre tipos de deuda.
+-   Mantener el ícono, etiquetas y formato monetario específicos de
+    cada tipo de deuda.
 
-No modificar el hipotecario salvo que aparezca un error.
+No modificar los formularios ya implementados salvo que aparezca un
+error.
 
 ------------------------------------------------------------------------
 

@@ -1,0 +1,209 @@
+{
+  "info": {
+    "name": "Asistente Financiero Inteligente - API",
+    "description": "Colección para probar el backend FastAPI (backend/main.py) del proyecto IA_FINANCIERA. Levanta la API con `uvicorn backend.main:app --reload` antes de usarla.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "deuda_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deudas",
+      "item": [
+        {
+          "name": "Listar deudas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/deudas", "host": ["{{base_url}}"], "path": ["deudas"] }
+          }
+        },
+        {
+          "name": "Registrar - Hipotecario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('deuda_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Cuotas pendientes = 219 (ejemplo sección 9 de CLAUDE.md)', () => {",
+                  "    pm.expect(pm.response.json().cuotas_pendientes).to.eql('219');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/hipotecario", "host": ["{{base_url}}"], "path": ["deudas", "hipotecario"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"monto_inicial\": 100000000.00,\n  \"saldo_actual\": 90000000.00,\n  \"tasa\": 11.00,\n  \"periodicidad_tasa\": \"Efectiva anual (EA)\",\n  \"tipo_tasa\": \"Fija\",\n  \"anos\": 20,\n  \"meses\": 0,\n  \"valor_cuota\": 994114.88,\n  \"cuota_proxima\": 22,\n  \"proximo_pago\": \"2026-09-17\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Tarjeta de crédito",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/tarjeta", "host": ["{{base_url}}"], "path": ["deudas", "tarjeta"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"franquicia\": \"Visa\",\n  \"cupo_total\": 800000,\n  \"saldo_actual\": 600000,\n  \"tasa\": 2.5,\n  \"periodicidad_tasa\": \"Mensual vencido (MV)\",\n  \"pago_minimo\": 50000,\n  \"cuota_manejo\": 10000,\n  \"dia_corte\": 15,\n  \"proximo_pago\": \"2026-10-05\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Crédito de vehículo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/vehiculo", "host": ["{{base_url}}"], "path": ["deudas", "vehiculo"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"Sufi Bancolombia\",\n  \"monto_inicial\": 40000000,\n  \"saldo_actual\": 30000000,\n  \"tasa\": 14.5,\n  \"periodicidad_tasa\": \"Efectiva anual (EA)\",\n  \"anos\": 5,\n  \"meses\": 0,\n  \"valor_cuota\": 900000,\n  \"cuota_proxima\": 10,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Crédito educativo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/educativo", "host": ["{{base_url}}"], "path": ["deudas", "educativo"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"ICETEX\",\n  \"carrera\": \"Pregrado Ingeniería\",\n  \"estado_credito\": \"En amortización (Pagando cuota completa)\",\n  \"cuotas_pendientes\": 24,\n  \"monto_inicial\": 15000000,\n  \"saldo_actual\": 8000000,\n  \"tasa\": 9.0,\n  \"periodicidad_tasa\": \"Efectiva anual (EA)\",\n  \"valor_cuota\": 400000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Préstamo de libre inversión",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/libre_inversion", "host": ["{{base_url}}"], "path": ["deudas", "libre_inversion"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"BBVA\",\n  \"monto_inicial\": 5000000,\n  \"saldo_actual\": 3000000,\n  \"tasa\": 15.0,\n  \"periodicidad_tasa\": \"Efectiva anual (EA)\",\n  \"total_meses\": 36,\n  \"cuota_proxima\": 10,\n  \"valor_cuota\": 200000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Préstamo personal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/prestamo_personal", "host": ["{{base_url}}"], "path": ["deudas", "prestamo_personal"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prestamista\": \"Tío Carlos\",\n  \"tipo_relacion\": \"Familiar\",\n  \"monto_inicial\": 0,\n  \"saldo_actual\": 200000,\n  \"tasa\": 0,\n  \"valor_cuota\": 50000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Crédito de consumo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/deudas/consumo", "host": ["{{base_url}}"], "path": ["deudas", "consumo"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"Alkosto\",\n  \"articulo\": \"Computador\",\n  \"monto_inicial\": 2000000,\n  \"saldo_actual\": 1500000,\n  \"tasa\": 1.8,\n  \"periodicidad_tasa\": \"Mensual\",\n  \"total_cuotas\": 12,\n  \"cuota_proxima\": 1,\n  \"valor_cuota\": 180000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar deuda (usa deuda_id de la última creada)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/deudas/{{deuda_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "{{deuda_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perfil",
+      "item": [
+        {
+          "name": "Obtener perfil",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/perfil", "host": ["{{base_url}}"], "path": ["perfil"] }
+          }
+        },
+        {
+          "name": "Actualizar perfil",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/perfil", "host": ["{{base_url}}"], "path": ["perfil"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salario_mensual\": 5000000,\n  \"otros_ingresos\": 0,\n  \"cantidad_hijos\": 1,\n  \"pago_colegio\": 300000,\n  \"pago_universidad\": 0,\n  \"alimentacion\": 800000,\n  \"transporte\": 200000,\n  \"vestimenta\": 100000,\n  \"entretenimiento\": 150000,\n  \"arriendo_hipoteca\": 1000000,\n  \"servicios_publicos\": 250000\n}"
+            }
+          }
+        },
+        {
+          "name": "Obtener meta de ahorro",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/meta-ahorro", "host": ["{{base_url}}"], "path": ["meta-ahorro"] }
+          }
+        },
+        {
+          "name": "Actualizar meta de ahorro",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/meta-ahorro", "host": ["{{base_url}}"], "path": ["meta-ahorro"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto_objetivo\": 10000000\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analisis",
+      "item": [
+        {
+          "name": "Obtener análisis financiero",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/analisis", "host": ["{{base_url}}"], "path": ["analisis"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"compras_no_esenciales\": 100000\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
