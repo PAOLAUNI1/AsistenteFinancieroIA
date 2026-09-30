@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from backend.database import Base, engine
-from backend.routers import analisis, deudas, perfil
+from backend.routers import analisis, deudas, perfil, usuarios
 
 Base.metadata.create_all(bind=engine)
 
@@ -17,6 +17,7 @@ def health_check():
     return {"status": "ok"}
 
 
+app.include_router(usuarios.router)
 app.include_router(deudas.router)
 app.include_router(perfil.router)
 app.include_router(analisis.router)

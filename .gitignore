@@ -9,3 +9,5 @@ backend/.venv/
 .pytest_cache/
 bd.env
 *.env
+backend/postman/.postman/
+backend/postman/postman/
