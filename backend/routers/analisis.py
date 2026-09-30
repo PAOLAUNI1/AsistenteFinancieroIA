@@ -3,13 +3,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models import Deuda
+from backend.deps import usuario_actual
+from backend.models import Deuda, Usuario
 from backend.services.analisis import calcular_analisis
-from backend.services.perfil import (
-    obtener_meta_principal,
-    obtener_o_crear_usuario_actual,
-    obtener_perfil,
-)
+from backend.services.perfil import obtener_meta_principal, obtener_perfil
 
 router = APIRouter(tags=["analisis"])
 
@@ -25,8 +22,11 @@ class AnalisisIn(BaseModel):
 
 
 @router.post("/analisis")
-def obtener_analisis(payload: AnalisisIn, db: Session = Depends(get_db)):
-    usuario = obtener_o_crear_usuario_actual(db)
+def obtener_analisis(
+    payload: AnalisisIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     perfil = obtener_perfil(db, usuario)
     meta = obtener_meta_principal(db, usuario)
 

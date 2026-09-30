@@ -58,3 +58,11 @@ def client():
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def usuario_id(client):
+    respuesta = client.post(
+        "/usuarios", json={"nombre": "Usuario de prueba", "correo": "prueba@example.com"}
+    )
+    return respuesta.json()["id"]

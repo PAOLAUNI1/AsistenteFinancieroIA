@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.deps import usuario_actual
 from backend.models import (
     CompraTarjeta,
     Deuda,
@@ -12,6 +13,7 @@ from backend.models import (
     DeudaVehiculo,
     PagoDeuda,
     TipoDeuda,
+    Usuario,
 )
 from backend.schemas.deuda import (
     ConsumoIn,
@@ -24,7 +26,6 @@ from backend.schemas.deuda import (
     VehiculoIn,
 )
 from backend.services import deudas as servicio_deudas
-from backend.services.perfil import obtener_o_crear_usuario_actual
 
 router = APIRouter(prefix="/deudas", tags=["deudas"])
 
@@ -79,9 +80,8 @@ def _a_deuda_out(deuda: Deuda, db: Session) -> DeudaOut:
     )
 
 
-def _registrar(db: Session, tipo_slug: str, resultado: dict) -> DeudaOut:
+def _registrar(db: Session, usuario: Usuario, tipo_slug: str, resultado: dict) -> DeudaOut:
     codigo_tipo, _ = servicio_deudas.VALIDADORES_POR_TIPO[tipo_slug]
-    usuario = obtener_o_crear_usuario_actual(db)
     tipo_deuda = db.query(TipoDeuda).filter(TipoDeuda.codigo == codigo_tipo).one()
 
     deuda = Deuda(usuario_id=usuario.id, tipo_deuda_id=tipo_deuda.id, **resultado["base"])
@@ -98,8 +98,7 @@ def _registrar(db: Session, tipo_slug: str, resultado: dict) -> DeudaOut:
 
 
 @router.get("", response_model=list[DeudaOut])
-def listar_deudas(db: Session = Depends(get_db)):
-    usuario = obtener_o_crear_usuario_actual(db)
+def listar_deudas(usuario: Usuario = Depends(usuario_actual), db: Session = Depends(get_db)):
     deudas = (
         db.query(Deuda)
         .filter(Deuda.usuario_id == usuario.id)
@@ -110,8 +109,14 @@ def listar_deudas(db: Session = Depends(get_db)):
 
 
 @router.delete("/{deuda_id}", status_code=204)
-def eliminar_deuda(deuda_id: int, db: Session = Depends(get_db)):
-    deuda = db.get(Deuda, deuda_id)
+def eliminar_deuda(
+    deuda_id: int, usuario: Usuario = Depends(usuario_actual), db: Session = Depends(get_db)
+):
+    deuda = (
+        db.query(Deuda)
+        .filter(Deuda.id == deuda_id, Deuda.usuario_id == usuario.id)
+        .first()
+    )
     if deuda is None:
         raise HTTPException(status_code=404, detail="Deuda no encontrada.")
 
@@ -128,63 +133,91 @@ def eliminar_deuda(deuda_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/hipotecario", response_model=DeudaOut, status_code=201)
-def registrar_hipotecario(payload: HipotecarioIn, db: Session = Depends(get_db)):
+def registrar_hipotecario(
+    payload: HipotecarioIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_hipotecario(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "hipotecario", resultado)
+    return _registrar(db, usuario, "hipotecario", resultado)
 
 
 @router.post("/tarjeta", response_model=DeudaOut, status_code=201)
-def registrar_tarjeta(payload: TarjetaIn, db: Session = Depends(get_db)):
+def registrar_tarjeta(
+    payload: TarjetaIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_tarjeta(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "tarjeta", resultado)
+    return _registrar(db, usuario, "tarjeta", resultado)
 
 
 @router.post("/vehiculo", response_model=DeudaOut, status_code=201)
-def registrar_vehiculo(payload: VehiculoIn, db: Session = Depends(get_db)):
+def registrar_vehiculo(
+    payload: VehiculoIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_vehiculo(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "vehiculo", resultado)
+    return _registrar(db, usuario, "vehiculo", resultado)
 
 
 @router.post("/educativo", response_model=DeudaOut, status_code=201)
-def registrar_educativo(payload: EducativoIn, db: Session = Depends(get_db)):
+def registrar_educativo(
+    payload: EducativoIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_educativo(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "educativo", resultado)
+    return _registrar(db, usuario, "educativo", resultado)
 
 
 @router.post("/libre_inversion", response_model=DeudaOut, status_code=201)
-def registrar_libre_inversion(payload: LibreInversionIn, db: Session = Depends(get_db)):
+def registrar_libre_inversion(
+    payload: LibreInversionIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_libre_inversion(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "libre_inversion", resultado)
+    return _registrar(db, usuario, "libre_inversion", resultado)
 
 
 @router.post("/prestamo_personal", response_model=DeudaOut, status_code=201)
-def registrar_prestamo_personal(payload: PrestamoPersonalIn, db: Session = Depends(get_db)):
+def registrar_prestamo_personal(
+    payload: PrestamoPersonalIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_prestamo_personal(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "prestamo_personal", resultado)
+    return _registrar(db, usuario, "prestamo_personal", resultado)
 
 
 @router.post("/consumo", response_model=DeudaOut, status_code=201)
-def registrar_consumo(payload: ConsumoIn, db: Session = Depends(get_db)):
+def registrar_consumo(
+    payload: ConsumoIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
     try:
         resultado = servicio_deudas.validar_consumo(**payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return _registrar(db, "consumo", resultado)
+    return _registrar(db, usuario, "consumo", resultado)

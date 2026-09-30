@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from backend.database import Base, engine
-from backend.routers import analisis, deudas, perfil, usuarios
+from backend.routers import analisis, catalogos, deudas, perfil, usuarios
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,6 +18,7 @@ def health_check():
 
 
 app.include_router(usuarios.router)
+app.include_router(catalogos.router)
 app.include_router(deudas.router)
 app.include_router(perfil.router)
 app.include_router(analisis.router)

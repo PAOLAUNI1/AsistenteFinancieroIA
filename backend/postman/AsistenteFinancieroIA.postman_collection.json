@@ -1,11 +1,12 @@
 {
   "info": {
     "name": "Asistente Financiero Inteligente - API",
-    "description": "Colección para probar el backend FastAPI (backend/main.py) del proyecto IA_FINANCIERA, conectado a la base MySQL `asistente_financiero`. Levanta la API con `uvicorn backend.main:app --reload` antes de usarla.",
+    "description": "Colección para probar el backend FastAPI (backend/main.py) del proyecto IA_FINANCIERA, conectado a la base MySQL `asistente_financiero`. Levanta la API con `uvicorn backend.main:app --reload` antes de usarla. Corre primero 'Usuarios > Registrar usuario': guarda el id en la variable de colección `usuario_id`, que usan automáticamente el resto de los requests (no hay login todavía, pero cada endpoint de datos exige indicar de qué usuario se trata).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "usuario_id", "value": "" },
     { "key": "deuda_id", "value": "" }
   ],
   "item": [
@@ -26,6 +27,20 @@
       "item": [
         {
           "name": "Registrar usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('usuario_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -46,13 +61,37 @@
       ]
     },
     {
+      "name": "Catálogos",
+      "item": [
+        {
+          "name": "Listar tipos de deuda",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/tipos-deuda", "host": ["{{base_url}}"], "path": ["tipos-deuda"] }
+          }
+        },
+        {
+          "name": "Listar categorías de gasto",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/categorias-gasto", "host": ["{{base_url}}"], "path": ["categorias-gasto"] }
+          }
+        }
+      ]
+    },
+    {
       "name": "Deudas",
       "item": [
         {
           "name": "Listar deudas",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/deudas", "host": ["{{base_url}}"], "path": ["deudas"] }
+            "url": {
+              "raw": "{{base_url}}/deudas?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            }
           }
         },
         {
@@ -77,7 +116,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/hipotecario", "host": ["{{base_url}}"], "path": ["deudas", "hipotecario"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/hipotecario?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "hipotecario"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"monto_inicial\": 100000000.00,\n  \"saldo_actual\": 90000000.00,\n  \"tasa\": 11.00,\n  \"periodicidad_tasa\": \"EA\",\n  \"tipo_tasa\": \"FIJA\",\n  \"anos\": 20,\n  \"meses\": 0,\n  \"valor_cuota\": 994114.88,\n  \"cuota_proxima\": 22,\n  \"proximo_pago\": \"2026-09-17\"\n}"
@@ -89,7 +133,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/tarjeta", "host": ["{{base_url}}"], "path": ["deudas", "tarjeta"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/tarjeta?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "tarjeta"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"franquicia\": \"Visa\",\n  \"ultimos_digitos\": \"4521\",\n  \"cupo_total\": 800000,\n  \"saldo_actual\": 600000,\n  \"tasa\": 2.5,\n  \"periodicidad_tasa\": \"MENSUAL\",\n  \"pago_minimo\": 50000,\n  \"cuota_manejo\": 10000,\n  \"dia_corte\": 15,\n  \"dia_pago\": 5,\n  \"proximo_pago\": \"2026-10-05\"\n}"
@@ -101,7 +150,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/vehiculo", "host": ["{{base_url}}"], "path": ["deudas", "vehiculo"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/vehiculo?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "vehiculo"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"Sufi Bancolombia\",\n  \"monto_inicial\": 40000000,\n  \"saldo_actual\": 30000000,\n  \"tasa\": 14.5,\n  \"periodicidad_tasa\": \"EA\",\n  \"anos\": 5,\n  \"meses\": 0,\n  \"valor_cuota\": 900000,\n  \"cuota_proxima\": 10,\n  \"proximo_pago\": \"2026-10-01\",\n  \"tipo_vehiculo\": \"AUTOMOVIL\",\n  \"marca\": \"Mazda\",\n  \"modelo\": \"CX-30\",\n  \"anio\": 2023,\n  \"placa\": \"ABC123\"\n}"
@@ -113,7 +167,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/educativo", "host": ["{{base_url}}"], "path": ["deudas", "educativo"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/educativo?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "educativo"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"ICETEX\",\n  \"carrera\": \"Pregrado Ingeniería\",\n  \"modalidad\": \"En amortización\",\n  \"cuotas_pendientes\": 24,\n  \"monto_inicial\": 15000000,\n  \"saldo_actual\": 8000000,\n  \"tasa\": 9.0,\n  \"periodicidad_tasa\": \"EA\",\n  \"valor_cuota\": 400000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
@@ -125,7 +184,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/libre_inversion", "host": ["{{base_url}}"], "path": ["deudas", "libre_inversion"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/libre_inversion?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "libre_inversion"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"BBVA\",\n  \"monto_inicial\": 5000000,\n  \"saldo_actual\": 3000000,\n  \"tasa\": 15.0,\n  \"periodicidad_tasa\": \"EA\",\n  \"total_meses\": 36,\n  \"cuota_proxima\": 10,\n  \"valor_cuota\": 200000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
@@ -137,7 +201,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/prestamo_personal", "host": ["{{base_url}}"], "path": ["deudas", "prestamo_personal"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/prestamo_personal?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "prestamo_personal"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"prestamista\": \"Tío Carlos\",\n  \"tipo_relacion\": \"Familiar\",\n  \"monto_inicial\": 0,\n  \"saldo_actual\": 200000,\n  \"tasa\": 0,\n  \"valor_cuota\": 50000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
@@ -149,7 +218,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/deudas/consumo", "host": ["{{base_url}}"], "path": ["deudas", "consumo"] },
+            "url": {
+              "raw": "{{base_url}}/deudas/consumo?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["deudas", "consumo"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"entidad\": \"Alkosto\",\n  \"articulo\": \"Computador\",\n  \"monto_inicial\": 2000000,\n  \"saldo_actual\": 1500000,\n  \"tasa\": 1.8,\n  \"periodicidad_tasa\": \"MENSUAL\",\n  \"total_cuotas\": 12,\n  \"cuota_proxima\": 1,\n  \"valor_cuota\": 180000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
@@ -161,9 +235,10 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{base_url}}/deudas/{{deuda_id}}",
+              "raw": "{{base_url}}/deudas/{{deuda_id}}?usuario_id={{usuario_id}}",
               "host": ["{{base_url}}"],
-              "path": ["deudas", "{{deuda_id}}"]
+              "path": ["deudas", "{{deuda_id}}"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
             }
           }
         }
@@ -176,7 +251,12 @@
           "name": "Obtener perfil",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/perfil", "host": ["{{base_url}}"], "path": ["perfil"] }
+            "url": {
+              "raw": "{{base_url}}/perfil?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["perfil"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            }
           }
         },
         {
@@ -184,7 +264,12 @@
           "request": {
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/perfil", "host": ["{{base_url}}"], "path": ["perfil"] },
+            "url": {
+              "raw": "{{base_url}}/perfil?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["perfil"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"salario_mensual\": 5000000,\n  \"otros_ingresos\": 0,\n  \"cantidad_hijos\": 1,\n  \"pago_colegio\": 300000,\n  \"pago_universidad\": 0,\n  \"alimentacion\": 800000,\n  \"transporte\": 200000,\n  \"vestimenta\": 100000,\n  \"entretenimiento\": 150000,\n  \"arriendo_hipoteca\": 1000000,\n  \"servicios_publicos\": 250000\n}"
@@ -195,7 +280,12 @@
           "name": "Obtener meta de ahorro",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/meta-ahorro", "host": ["{{base_url}}"], "path": ["meta-ahorro"] }
+            "url": {
+              "raw": "{{base_url}}/meta-ahorro?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["meta-ahorro"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            }
           }
         },
         {
@@ -203,7 +293,12 @@
           "request": {
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/meta-ahorro", "host": ["{{base_url}}"], "path": ["meta-ahorro"] },
+            "url": {
+              "raw": "{{base_url}}/meta-ahorro?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["meta-ahorro"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"monto_objetivo\": 10000000\n}"
@@ -220,7 +315,12 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/analisis", "host": ["{{base_url}}"], "path": ["analisis"] },
+            "url": {
+              "raw": "{{base_url}}/analisis?usuario_id={{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["analisis"],
+              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"compras_no_esenciales\": 100000\n}"

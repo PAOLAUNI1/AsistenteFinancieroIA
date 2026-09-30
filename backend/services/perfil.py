@@ -9,20 +9,16 @@ chk_gastos_monto) y `monto_objetivo > 0` en metas_ahorro (chk_metas_objetivo):
 un campo en $0 en el formulario no se guarda como fila, simplemente no existe
 esa fila (y si existía, se borra al volver a poner el campo en 0).
 
-Todavía no hay autenticación ni sesión (fue una decisión explícita para esta
-primera fase): cualquiera puede crear un usuario con POST /usuarios, pero
-"el usuario actual" que usan /perfil, /deudas, /meta-ahorro y /analisis sigue
-siendo implícito, igual que hoy en Streamlit con `st.session_state` — se
-toma el usuario creado más recientemente. Si todavía no existe ninguno, se
-crea uno "demo" por defecto la primera vez que se pide el perfil, para que
-esos endpoints no fallen antes de registrar un usuario real.
+Todavía no hay autenticación con contraseña (fue una decisión explícita para
+esta primera fase): un usuario se crea con POST /usuarios sin login. Pero
+"qué usuario" opera sobre /perfil, /deudas, /meta-ahorro y /analisis ya NO es
+implícito — cada request debe pasar `usuario_id` (ver backend/deps.py), para
+que con varios usuarios registrados cada uno solo vea sus propios datos.
 """
 
 from sqlalchemy.orm import Session
 
 from backend.models import CategoriaGasto, Gasto, Ingreso, MetaAhorro, Usuario
-
-CORREO_USUARIO_POR_DEFECTO = "usuario.demo@asistente-financiero.local"
 
 # Categorías de gasto sembradas en la base (sección 4 de CLAUDE.md).
 CATEGORIAS_GASTO_PERFIL = {
@@ -50,16 +46,6 @@ def crear_usuario(db: Session, nombre: str, correo: str, cantidad_hijos: int = 0
 
 def listar_usuarios(db: Session) -> list[Usuario]:
     return db.query(Usuario).order_by(Usuario.id.desc()).all()
-
-
-def obtener_o_crear_usuario_actual(db: Session) -> Usuario:
-    usuario = db.query(Usuario).order_by(Usuario.id.desc()).first()
-    if usuario is None:
-        usuario = Usuario(nombre="Usuario demo", correo=CORREO_USUARIO_POR_DEFECTO)
-        db.add(usuario)
-        db.commit()
-        db.refresh(usuario)
-    return usuario
 
 
 def _upsert_ingreso(db: Session, usuario_id: int, tipo: str, monto: float) -> None:

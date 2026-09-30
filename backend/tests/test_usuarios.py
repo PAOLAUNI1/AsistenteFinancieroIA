@@ -20,9 +20,12 @@ def test_registrar_usuario_con_correo_invalido_devuelve_422(client):
     assert respuesta.status_code == 422
 
 
-def test_usuario_recien_creado_pasa_a_ser_el_usuario_actual(client):
-    client.post("/usuarios", json={"nombre": "Demo previo", "correo": "demo@example.com"})
-    nuevo = client.post("/usuarios", json={"nombre": "Nuevo", "correo": "nuevo@example.com"}).json()
+def test_perfil_usa_el_usuario_id_indicado_explicitamente(client):
+    uno = client.post("/usuarios", json={"nombre": "Uno", "correo": "uno@example.com"}).json()
+    dos = client.post("/usuarios", json={"nombre": "Dos", "correo": "dos@example.com"}).json()
 
-    perfil = client.get("/perfil").json()
-    assert perfil["usuario_id"] == nuevo["id"]
+    perfil_uno = client.get("/perfil", params={"usuario_id": uno["id"]}).json()
+    perfil_dos = client.get("/perfil", params={"usuario_id": dos["id"]}).json()
+
+    assert perfil_uno["usuario_id"] == uno["id"]
+    assert perfil_dos["usuario_id"] == dos["id"]
