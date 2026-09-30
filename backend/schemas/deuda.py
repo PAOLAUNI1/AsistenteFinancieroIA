@@ -1,6 +1,10 @@
 from datetime import date
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+PeriodicidadTasa = Literal["EA", "MENSUAL"]
+TipoTasa = Literal["FIJA", "VARIABLE"]
 
 
 class HipotecarioIn(BaseModel):
@@ -8,8 +12,8 @@ class HipotecarioIn(BaseModel):
     monto_inicial: float = Field(gt=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(gt=0)
-    periodicidad_tasa: str = "Efectiva anual (EA)"
-    tipo_tasa: str = "Fija"
+    periodicidad_tasa: PeriodicidadTasa = "EA"
+    tipo_tasa: TipoTasa = "FIJA"
     anos: int = Field(ge=0, default=0)
     meses: int = Field(ge=0, le=11, default=0)
     valor_cuota: float = Field(gt=0)
@@ -20,13 +24,15 @@ class HipotecarioIn(BaseModel):
 class TarjetaIn(BaseModel):
     entidad: str
     franquicia: str = "Visa"
+    ultimos_digitos: str | None = Field(default=None, max_length=4)
     cupo_total: float = Field(gt=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
-    periodicidad_tasa: str = "Mensual vencido (MV)"
+    periodicidad_tasa: PeriodicidadTasa = "MENSUAL"
     pago_minimo: float = Field(gt=0)
     cuota_manejo: float = 0.0
     dia_corte: int = Field(ge=1, le=31, default=15)
+    dia_pago: int = Field(ge=1, le=31, default=5)
     proximo_pago: date
 
 
@@ -35,23 +41,28 @@ class VehiculoIn(BaseModel):
     monto_inicial: float = Field(gt=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
-    periodicidad_tasa: str = "Efectiva anual (EA)"
+    periodicidad_tasa: PeriodicidadTasa = "EA"
     anos: int = Field(ge=0, default=0)
     meses: int = Field(ge=0, le=11, default=0)
     valor_cuota: float = Field(gt=0)
     cuota_proxima: int = Field(ge=1, default=1)
     proximo_pago: date
+    tipo_vehiculo: Literal["AUTOMOVIL", "MOTOCICLETA", "CAMIONETA", "OTRO"] = "AUTOMOVIL"
+    marca: str | None = None
+    modelo: str | None = None
+    anio: int | None = Field(default=None, ge=1950, le=2100)
+    placa: str | None = None
 
 
 class EducativoIn(BaseModel):
     entidad: str
     carrera: str = ""
-    estado_credito: str = "En amortización (Pagando cuota completa)"
+    modalidad: str = "En amortización"
     cuotas_pendientes: int = Field(ge=1, le=360, default=24)
     monto_inicial: float = Field(ge=0, default=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
-    periodicidad_tasa: str = "Efectiva anual (EA)"
+    periodicidad_tasa: PeriodicidadTasa = "EA"
     valor_cuota: float = Field(gt=0)
     proximo_pago: date
 
@@ -61,7 +72,7 @@ class LibreInversionIn(BaseModel):
     monto_inicial: float = Field(gt=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
-    periodicidad_tasa: str = "Efectiva anual (EA)"
+    periodicidad_tasa: PeriodicidadTasa = "EA"
     total_meses: int = Field(ge=1, le=120, default=36)
     cuota_proxima: int = Field(ge=1, default=1)
     valor_cuota: float = Field(gt=0)
@@ -84,7 +95,7 @@ class ConsumoIn(BaseModel):
     monto_inicial: float = Field(ge=0, default=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
-    periodicidad_tasa: str = "Mensual"
+    periodicidad_tasa: PeriodicidadTasa = "MENSUAL"
     total_cuotas: int = Field(ge=1, le=72, default=12)
     cuota_proxima: int = Field(ge=1, default=1)
     valor_cuota: float = Field(gt=0)
@@ -92,22 +103,21 @@ class ConsumoIn(BaseModel):
 
 
 class DeudaOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
-    tipo: str
-    icono: str
+    tipo_codigo: str
+    tipo_nombre: str
+    icono: str | None
     entidad: str
-    monto_inicial: float
+    monto_inicial: float | None
     saldo_actual: float
-    tasa: float
-    periodicidad_tasa: str
-    tipo_tasa: str
-    anos: int
-    meses: int
-    total_cuotas: str
-    cuota_proxima: int
-    cuotas_pendientes: str
-    valor_cuota: float
-    proximo_pago: str
+    tiene_intereses: bool
+    tasa_interes: float | None
+    periodicidad_tasa: str | None
+    tipo_tasa: str | None
+    plazo_meses: int | None
+    valor_cuota: float | None
+    proxima_cuota: int | None
+    cuotas_pendientes: int | None
+    fecha_proximo_pago: date | None
+    estado: str
     detalle: dict

@@ -16,16 +16,17 @@ class PerfilIn(BaseModel):
 
 
 class PerfilOut(PerfilIn):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
+    usuario_id: int
 
 
 class MetaAhorroIn(BaseModel):
-    monto_objetivo: float = Field(ge=0, default=0.0)
+    monto_objetivo: float = Field(gt=0)
 
 
-class MetaAhorroOut(MetaAhorroIn):
+class MetaAhorroOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: int | None
+    usuario_id: int
+    monto_objetivo: float
+    monto_actual: float

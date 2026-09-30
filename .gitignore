@@ -7,3 +7,5 @@ venv/
 backend/asistente_financiero.db
 backend/.venv/
 .pytest_cache/
+bd.env
+*.env

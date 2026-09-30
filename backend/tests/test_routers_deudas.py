@@ -4,8 +4,8 @@ def test_registrar_hipotecario_y_listar(client):
         "monto_inicial": 100_000_000.0,
         "saldo_actual": 90_000_000.0,
         "tasa": 11.0,
-        "periodicidad_tasa": "Efectiva anual (EA)",
-        "tipo_tasa": "Fija",
+        "periodicidad_tasa": "EA",
+        "tipo_tasa": "FIJA",
         "anos": 20,
         "meses": 0,
         "valor_cuota": 994114.88,
@@ -16,8 +16,9 @@ def test_registrar_hipotecario_y_listar(client):
     respuesta = client.post("/deudas/hipotecario", json=payload)
     assert respuesta.status_code == 201
     cuerpo = respuesta.json()
-    assert cuerpo["cuotas_pendientes"] == "219"
-    assert cuerpo["total_cuotas"] == "240"
+    assert cuerpo["plazo_meses"] == 240
+    assert cuerpo["cuotas_pendientes"] == 219
+    assert cuerpo["tipo_codigo"] == "HIPOTECARIO"
 
     listado = client.get("/deudas")
     assert listado.status_code == 200
@@ -38,6 +39,27 @@ def test_registrar_hipotecario_invalido_devuelve_422(client):
 
     respuesta = client.post("/deudas/hipotecario", json=payload)
     assert respuesta.status_code == 422
+
+
+def test_tarjeta_guarda_detalle_y_no_tiene_plazo_fijo(client):
+    payload = {
+        "entidad": "Bancolombia",
+        "franquicia": "Visa",
+        "cupo_total": 800000,
+        "saldo_actual": 600000,
+        "tasa": 2.5,
+        "pago_minimo": 50000,
+        "cuota_manejo": 10000,
+        "dia_corte": 15,
+        "dia_pago": 5,
+        "proximo_pago": "2026-10-05",
+    }
+    respuesta = client.post("/deudas/tarjeta", json=payload)
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["plazo_meses"] is None
+    assert cuerpo["detalle"]["dia_corte"] == 15
+    assert cuerpo["detalle"]["dia_pago"] == 5
 
 
 def test_eliminar_deuda(client):
