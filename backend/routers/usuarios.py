@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.schemas.usuario import UsuarioIn, UsuarioOut
-from backend.services.perfil import crear_usuario, listar_usuarios
+from backend.services.perfil import crear_usuario, listar_usuarios, obtener_usuario
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -16,6 +16,30 @@ def listar(db: Session = Depends(get_db)):
 @router.post("", response_model=UsuarioOut, status_code=201)
 def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
     try:
-        return crear_usuario(db, payload.nombre, payload.correo, payload.cantidad_hijos)
+        return crear_usuario(
+            db,
+            payload.nombre,
+            payload.correo,
+            payload.acepta_terminos,
+            payload.acepta_tratamiento_datos,
+            payload.cantidad_hijos,
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        mensaje = str(exc)
+        # "no aceptó" es error de validación del cliente (422); correo
+        # duplicado es conflicto con un recurso existente (409).
+        status = 422 if "aceptar" in mensaje else 409
+        raise HTTPException(status_code=status, detail=mensaje)
+
+
+@router.get("/{usuario_id}", response_model=UsuarioOut)
+def obtener(usuario_id: int, db: Session = Depends(get_db)):
+    """
+    Lo que el orquestador (App_or_ns, hoy la capa de routers) consulta al
+    abrir la app para decidir si el usuario va al menú principal
+    (estado == "ACTIVO") o al flujo de registro.
+    """
+    usuario = obtener_usuario(db, usuario_id)
+    if usuario is None:
+        raise HTTPException(status_code=404, detail=f"No existe un usuario con id {usuario_id}.")
+    return usuario

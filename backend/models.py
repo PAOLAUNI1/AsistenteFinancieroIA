@@ -31,6 +31,8 @@ class Usuario(Base):
     correo: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
     contrasena_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cantidad_hijos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    acepto_terminos_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    acepto_tratamiento_datos_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     estado: Mapped[str] = mapped_column(
         Enum("ACTIVO", "INACTIVO", name="estado_usuario"), nullable=False, default="ACTIVO"
     )

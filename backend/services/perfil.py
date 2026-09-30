@@ -16,6 +16,8 @@ implícito — cada request debe pasar `usuario_id` (ver backend/deps.py), para
 que con varios usuarios registrados cada uno solo vea sus propios datos.
 """
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from backend.models import CategoriaGasto, Gasto, Ingreso, MetaAhorro, Usuario
@@ -33,15 +35,41 @@ CATEGORIAS_GASTO_PERFIL = {
 }
 
 
-def crear_usuario(db: Session, nombre: str, correo: str, cantidad_hijos: int = 0) -> Usuario:
+def crear_usuario(
+    db: Session,
+    nombre: str,
+    correo: str,
+    acepta_terminos: bool,
+    acepta_tratamiento_datos: bool,
+    cantidad_hijos: int = 0,
+) -> Usuario:
+    # El flujo de registro no puede avanzar sin ambas aceptaciones (sección
+    # de registro validada con el usuario: términos y condiciones +
+    # tratamiento de datos son obligatorios antes de crear la cuenta).
+    if not acepta_terminos or not acepta_tratamiento_datos:
+        raise ValueError(
+            "Debes aceptar los términos y condiciones y el tratamiento de datos para registrarte."
+        )
+
     if db.query(Usuario).filter(Usuario.correo == correo).first() is not None:
         raise ValueError(f"Ya existe un usuario registrado con el correo {correo}.")
 
-    usuario = Usuario(nombre=nombre.strip(), correo=correo.strip(), cantidad_hijos=cantidad_hijos)
+    ahora = datetime.utcnow()
+    usuario = Usuario(
+        nombre=nombre.strip(),
+        correo=correo.strip(),
+        cantidad_hijos=cantidad_hijos,
+        acepto_terminos_en=ahora,
+        acepto_tratamiento_datos_en=ahora,
+    )
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+def obtener_usuario(db: Session, usuario_id: int) -> Usuario | None:
+    return db.get(Usuario, usuario_id)
 
 
 def listar_usuarios(db: Session) -> list[Usuario]:

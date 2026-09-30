@@ -47,7 +47,7 @@
             "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Juan Camilo Garcia\",\n  \"correo\": \"juancamilo@example.com\",\n  \"cantidad_hijos\": 0\n}"
+              "raw": "{\n  \"nombre\": \"Juan Camilo Garcia\",\n  \"correo\": \"juancamilo@example.com\",\n  \"cantidad_hijos\": 0,\n  \"acepta_terminos\": true,\n  \"acepta_tratamiento_datos\": true\n}"
             }
           }
         },
@@ -56,6 +56,17 @@
           "request": {
             "method": "GET",
             "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] }
+          }
+        },
+        {
+          "name": "Obtener usuario por id (chequeo de estado al abrir la app)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/usuarios/{{usuario_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "{{usuario_id}}"]
+            }
           }
         }
       ]

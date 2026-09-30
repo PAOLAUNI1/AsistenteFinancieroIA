@@ -55,12 +55,15 @@ def test_deudas_con_usuario_inexistente_devuelve_404(client):
     assert respuesta.status_code == 404
 
 
+ACEPTACIONES = {"acepta_terminos": True, "acepta_tratamiento_datos": True}
+
+
 def test_un_usuario_no_ve_las_deudas_de_otro(client):
     usuario_a = client.post(
-        "/usuarios", json={"nombre": "A", "correo": "a@example.com"}
+        "/usuarios", json={"nombre": "A", "correo": "a@example.com", **ACEPTACIONES}
     ).json()["id"]
     usuario_b = client.post(
-        "/usuarios", json={"nombre": "B", "correo": "b@example.com"}
+        "/usuarios", json={"nombre": "B", "correo": "b@example.com", **ACEPTACIONES}
     ).json()["id"]
 
     client.post(
@@ -122,10 +125,10 @@ def test_eliminar_deuda(client, usuario_id):
 
 def test_no_se_puede_eliminar_la_deuda_de_otro_usuario(client):
     usuario_a = client.post(
-        "/usuarios", json={"nombre": "A", "correo": "a2@example.com"}
+        "/usuarios", json={"nombre": "A", "correo": "a2@example.com", **ACEPTACIONES}
     ).json()["id"]
     usuario_b = client.post(
-        "/usuarios", json={"nombre": "B", "correo": "b2@example.com"}
+        "/usuarios", json={"nombre": "B", "correo": "b2@example.com", **ACEPTACIONES}
     ).json()["id"]
 
     deuda = client.post(

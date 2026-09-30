@@ -63,6 +63,12 @@ def client():
 @pytest.fixture()
 def usuario_id(client):
     respuesta = client.post(
-        "/usuarios", json={"nombre": "Usuario de prueba", "correo": "prueba@example.com"}
+        "/usuarios",
+        json={
+            "nombre": "Usuario de prueba",
+            "correo": "prueba@example.com",
+            "acepta_terminos": True,
+            "acepta_tratamiento_datos": True,
+        },
     )
     return respuesta.json()["id"]
