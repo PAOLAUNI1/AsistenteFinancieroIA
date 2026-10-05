@@ -1,3 +1,8 @@
+import os
+
+# Debe fijarse antes de importar la app: baja el costo de bcrypt para que los tests sean rápidos.
+os.environ["BCRYPT_ROUNDS"] = "4"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -56,7 +61,9 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    cliente = TestClient(app)
+    cliente.session_factory = TestingSessionLocal  # para tests que necesitan tocar la BD directo
+    yield cliente
     app.dependency_overrides.clear()
 
 
@@ -67,6 +74,7 @@ def usuario_id(client):
         json={
             "nombre": "Usuario de prueba",
             "correo": "prueba@example.com",
+            "contrasena": "Segura1234",
             "acepta_terminos": True,
             "acepta_tratamiento_datos": True,
         },

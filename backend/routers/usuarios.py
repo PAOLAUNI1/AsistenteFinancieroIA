@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.schemas.usuario import UsuarioIn, UsuarioOut
-from backend.services.perfil import crear_usuario, listar_usuarios, obtener_usuario
+from backend.schemas.usuario import LoginIn, UsuarioIn, UsuarioOut
+from backend.services.perfil import (
+    autenticar_usuario,
+    crear_usuario,
+    listar_usuarios,
+    obtener_usuario,
+)
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -20,6 +25,7 @@ def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
             db,
             payload.nombre,
             payload.correo,
+            payload.contrasena,
             payload.acepta_terminos,
             payload.acepta_tratamiento_datos,
             payload.cantidad_hijos,
@@ -30,6 +36,17 @@ def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
         # duplicado es conflicto con un recurso existente (409).
         status = 422 if "aceptar" in mensaje else 409
         raise HTTPException(status_code=status, detail=mensaje)
+
+
+@router.post("/login", response_model=UsuarioOut)
+def iniciar_sesion(payload: LoginIn, db: Session = Depends(get_db)):
+    usuario = autenticar_usuario(db, payload.correo, payload.contrasena)
+    # Mismo mensaje si el correo no existe o la contraseña es incorrecta.
+    if usuario is None:
+        raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
+    if usuario.estado != "ACTIVO":
+        raise HTTPException(status_code=403, detail="La cuenta no está activa.")
+    return usuario
 
 
 @router.get("/{usuario_id}", response_model=UsuarioOut)

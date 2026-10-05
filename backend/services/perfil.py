@@ -9,11 +9,11 @@ chk_gastos_monto) y `monto_objetivo > 0` en metas_ahorro (chk_metas_objetivo):
 un campo en $0 en el formulario no se guarda como fila, simplemente no existe
 esa fila (y si existía, se borra al volver a poner el campo en 0).
 
-Todavía no hay autenticación con contraseña (fue una decisión explícita para
-esta primera fase): un usuario se crea con POST /usuarios sin login. Pero
-"qué usuario" opera sobre /perfil, /deudas, /meta-ahorro y /analisis ya NO es
-implícito — cada request debe pasar `usuario_id` (ver backend/deps.py), para
-que con varios usuarios registrados cada uno solo vea sus propios datos.
+Un usuario se registra con POST /usuarios (con contraseña, guardada solo como
+hash) y entra con POST /usuarios/login. Todavía no hay token de sesión:
+"qué usuario" opera sobre /perfil, /deudas, /meta-ahorro y /analisis se
+indica con `usuario_id` en cada request (ver backend/deps.py), para que con
+varios usuarios registrados cada uno solo vea sus propios datos.
 """
 
 from datetime import datetime
@@ -21,6 +21,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from backend.models import CategoriaGasto, Gasto, Ingreso, MetaAhorro, Usuario
+from backend.services.seguridad import hashear_contrasena, verificar_contrasena
 
 # Categorías de gasto sembradas en la base (sección 4 de CLAUDE.md).
 CATEGORIAS_GASTO_PERFIL = {
@@ -39,6 +40,7 @@ def crear_usuario(
     db: Session,
     nombre: str,
     correo: str,
+    contrasena: str,
     acepta_terminos: bool,
     acepta_tratamiento_datos: bool,
     cantidad_hijos: int = 0,
@@ -58,6 +60,7 @@ def crear_usuario(
     usuario = Usuario(
         nombre=nombre.strip(),
         correo=correo.strip(),
+        contrasena_hash=hashear_contrasena(contrasena),
         cantidad_hijos=cantidad_hijos,
         acepto_terminos_en=ahora,
         acepto_tratamiento_datos_en=ahora,
@@ -65,6 +68,16 @@ def crear_usuario(
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
+    return usuario
+
+
+def autenticar_usuario(db: Session, correo: str, contrasena: str) -> Usuario | None:
+    """Devuelve el usuario si correo y contraseña coinciden; None en cualquier otro caso."""
+    usuario = db.query(Usuario).filter(Usuario.correo == correo.strip()).first()
+    hash_guardado = usuario.contrasena_hash if usuario else None
+    # Se verifica siempre (incluso sin usuario) para no revelar por tiempo si el correo existe.
+    if not verificar_contrasena(contrasena, hash_guardado):
+        return None
     return usuario
 
 

@@ -1,14 +1,29 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from backend.services.seguridad import MAX_BYTES_CONTRASENA
 
 
 class UsuarioIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=100)
     correo: EmailStr
+    contrasena: str = Field(min_length=8, max_length=MAX_BYTES_CONTRASENA)
     cantidad_hijos: int = Field(ge=0, default=0)
     acepta_terminos: bool
     acepta_tratamiento_datos: bool
+
+    @field_validator("contrasena")
+    @classmethod
+    def _contrasena_cabe_en_bcrypt(cls, valor: str) -> str:
+        if len(valor.encode("utf-8")) > MAX_BYTES_CONTRASENA:
+            raise ValueError(f"La contraseña no puede superar {MAX_BYTES_CONTRASENA} bytes.")
+        return valor
+
+
+class LoginIn(BaseModel):
+    correo: EmailStr
+    contrasena: str = Field(min_length=1, max_length=128)
 
 
 class UsuarioOut(BaseModel):
