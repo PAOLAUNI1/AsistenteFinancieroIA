@@ -19,6 +19,11 @@ class HipotecarioIn(BaseModel):
     valor_cuota: float = Field(gt=0)
     cuota_proxima: int = Field(ge=1, default=1)
     proximo_pago: date
+    nombre: str | None = Field(default=None, max_length=100)
+    fecha_inicio: date | None = None
+    descripcion: str | None = Field(default=None, max_length=200)
+    # False deja la deuda en estado CANCELADA: no cuenta en el análisis.
+    activa: bool = True
 
 
 class TarjetaIn(BaseModel):
@@ -120,4 +125,7 @@ class DeudaOut(BaseModel):
     cuotas_pendientes: int | None
     fecha_proximo_pago: date | None
     estado: str
+    nombre: str | None = None
+    fecha_inicio: date | None = None
+    descripcion: str | None = None
     detalle: dict

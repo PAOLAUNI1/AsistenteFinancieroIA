@@ -47,7 +47,33 @@
             "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Juan Camilo Garcia\",\n  \"correo\": \"juancamilo@example.com\",\n  \"cantidad_hijos\": 0,\n  \"acepta_terminos\": true,\n  \"acepta_tratamiento_datos\": true\n}"
+              "raw": "{\n  \"nombre\": \"Juan Camilo Garcia\",\n  \"correo\": \"juancamilo@example.com\",\n  \"contrasena\": \"Segura1234\",\n  \"cantidad_hijos\": 0,\n  \"acepta_terminos\": true,\n  \"acepta_tratamiento_datos\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Iniciar sesión",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('usuario_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/usuarios/login", "host": ["{{base_url}}"], "path": ["usuarios", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"juancamilo@example.com\",\n  \"contrasena\": \"Segura1234\"\n}"
             }
           }
         },
@@ -135,7 +161,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"monto_inicial\": 100000000.00,\n  \"saldo_actual\": 90000000.00,\n  \"tasa\": 11.00,\n  \"periodicidad_tasa\": \"EA\",\n  \"tipo_tasa\": \"FIJA\",\n  \"anos\": 20,\n  \"meses\": 0,\n  \"valor_cuota\": 994114.88,\n  \"cuota_proxima\": 22,\n  \"proximo_pago\": \"2026-09-17\"\n}"
+              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"monto_inicial\": 100000000.00,\n  \"saldo_actual\": 90000000.00,\n  \"tasa\": 11.00,\n  \"periodicidad_tasa\": \"EA\",\n  \"tipo_tasa\": \"FIJA\",\n  \"anos\": 20,\n  \"meses\": 0,\n  \"valor_cuota\": 994114.88,\n  \"cuota_proxima\": 22,\n  \"proximo_pago\": \"2026-09-17\",\n  \"nombre\": \"Crédito hipotecario vivienda\",\n  \"fecha_inicio\": \"2025-01-15\",\n  \"descripcion\": \"Crédito para apartamento en Bogotá\",\n  \"activa\": true\n}"
             }
           }
         },

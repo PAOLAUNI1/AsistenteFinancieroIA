@@ -75,6 +75,7 @@ class Deuda(Base):
     tipo_deuda_id: Mapped[int] = mapped_column(ForeignKey("tipos_deuda.id"), nullable=False)
 
     entidad: Mapped[str] = mapped_column(String(100), nullable=False)
+    nombre: Mapped[str | None] = mapped_column(String(100), nullable=True)
     monto_inicial: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     saldo_actual: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
 
@@ -91,6 +92,8 @@ class Deuda(Base):
     valor_cuota: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     proxima_cuota: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     fecha_proximo_pago: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_inicio: Mapped[date | None] = mapped_column(Date, nullable=True)
+    descripcion: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     estado: Mapped[str] = mapped_column(
         Enum("ACTIVA", "PAGADA", "CANCELADA", name="estado_deuda"),

@@ -76,6 +76,9 @@ def _a_deuda_out(deuda: Deuda, db: Session) -> DeudaOut:
         cuotas_pendientes=cuotas_pendientes,
         fecha_proximo_pago=deuda.fecha_proximo_pago,
         estado=deuda.estado,
+        nombre=deuda.nombre,
+        fecha_inicio=deuda.fecha_inicio,
+        descripcion=deuda.descripcion,
         detalle=detalle,
     )
 

@@ -55,7 +55,11 @@ def test_deudas_con_usuario_inexistente_devuelve_404(client):
     assert respuesta.status_code == 404
 
 
-ACEPTACIONES = {"acepta_terminos": True, "acepta_tratamiento_datos": True}
+ACEPTACIONES = {
+    "contrasena": "Segura1234",
+    "acepta_terminos": True,
+    "acepta_tratamiento_datos": True,
+}
 
 
 def test_un_usuario_no_ve_las_deudas_de_otro(client):
@@ -197,3 +201,93 @@ def test_listar_tipos_deuda(client):
         "PRESTAMO_PERSONAL",
         "CONSUMO",
     }
+
+
+def _payload_hipotecario(**extra):
+    return {
+        "entidad": "Banco XYZ",
+        "monto_inicial": 94_000_000,
+        "saldo_actual": 89_800_000,
+        "tasa": 11,
+        "periodicidad_tasa": "EA",
+        "tipo_tasa": "FIJA",
+        "anos": 20,
+        "meses": 0,
+        "valor_cuota": 994_115,
+        "cuota_proxima": 23,
+        "proximo_pago": "2026-10-15",
+        **extra,
+    }
+
+
+def test_hipotecario_guarda_nombre_fecha_inicio_y_descripcion(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/hipotecario",
+        params={"usuario_id": usuario_id},
+        json=_payload_hipotecario(
+            nombre="Crédito hipotecario vivienda",
+            fecha_inicio="2025-01-15",
+            descripcion="Apartamento en Bogotá",
+        ),
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre"] == "Crédito hipotecario vivienda"
+    assert cuerpo["fecha_inicio"] == "2025-01-15"
+    assert cuerpo["descripcion"] == "Apartamento en Bogotá"
+    assert cuerpo["estado"] == "ACTIVA"
+    assert cuerpo["cuotas_pendientes"] == 218  # 240 - 22 pagadas
+
+    listado = client.get("/deudas", params={"usuario_id": usuario_id}).json()
+    assert listado[0]["nombre"] == "Crédito hipotecario vivienda"
+
+
+def test_hipotecario_sin_los_campos_nuevos_sigue_funcionando(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/hipotecario", params={"usuario_id": usuario_id}, json=_payload_hipotecario()
+    )
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["nombre"] is None
+    assert respuesta.json()["fecha_inicio"] is None
+
+
+def test_hipotecario_inactiva_queda_cancelada_y_no_cuenta_en_el_analisis(client, usuario_id):
+    client.post(
+        "/deudas/hipotecario",
+        params={"usuario_id": usuario_id},
+        json=_payload_hipotecario(activa=False),
+    )
+    activa = client.post(
+        "/deudas/hipotecario",
+        params={"usuario_id": usuario_id},
+        json=_payload_hipotecario(saldo_actual=1_000_000),
+    ).json()
+
+    assert activa["estado"] == "ACTIVA"
+    estados = {d["estado"] for d in client.get("/deudas", params={"usuario_id": usuario_id}).json()}
+    assert estados == {"ACTIVA", "CANCELADA"}
+
+    analisis = client.post(
+        "/analisis", params={"usuario_id": usuario_id}, json={"compras_no_esenciales": 0}
+    ).json()
+    assert analisis["deuda_total"] == 1_000_000  # solo la activa
+
+
+def test_hipotecario_con_fecha_de_inicio_posterior_al_proximo_pago_devuelve_422(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/hipotecario",
+        params={"usuario_id": usuario_id},
+        json=_payload_hipotecario(fecha_inicio="2027-01-01"),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_hipotecario_con_descripcion_de_mas_de_200_caracteres_devuelve_422(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/hipotecario",
+        params={"usuario_id": usuario_id},
+        json=_payload_hipotecario(descripcion="x" * 201),
+    )
+    assert respuesta.status_code == 422
