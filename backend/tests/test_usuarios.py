@@ -95,17 +95,13 @@ def test_registrar_usuario_con_correo_invalido_devuelve_422(client):
     assert respuesta.status_code == 422
 
 
-def test_obtener_usuario_por_id(client):
+def test_mi_usuario_devuelve_al_dueno_del_token(client):
     creado = _registrar(client, "obtener@example.com").json()
 
-    respuesta = client.get(f"/usuarios/{creado['id']}")
+    respuesta = client.get("/usuarios/me", params={"usuario_id": creado["id"]})
     assert respuesta.status_code == 200
+    assert respuesta.json()["correo"] == "obtener@example.com"
     assert respuesta.json()["estado"] == "ACTIVO"
-
-
-def test_obtener_usuario_inexistente_devuelve_404(client):
-    respuesta = client.get("/usuarios/999999")
-    assert respuesta.status_code == 404
 
 
 def test_perfil_usa_el_usuario_id_indicado_explicitamente(client):

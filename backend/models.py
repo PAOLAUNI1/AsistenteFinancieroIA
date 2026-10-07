@@ -7,6 +7,7 @@ esquema cambia en la base de datos, estos modelos deben actualizarse a mano.
 
 from datetime import date, datetime
 
+from sqlalchemy.dialects import mysql
 from sqlalchemy import (
     Boolean,
     Date,
@@ -150,6 +151,20 @@ class DeudaEducativo(Base):
     programa: Mapped[str | None] = mapped_column(String(120), nullable=True)
     modalidad: Mapped[str | None] = mapped_column(String(80), nullable=True)
     beneficiario: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+
+class DeudaOtro(Base):
+    """Detalle 1:1 para deudas de tipo OTRO (otras deudas: préstamos familiares, de amigos, etc.)."""
+
+    __tablename__ = "deuda_otro"
+
+    # La base real usa INT UNSIGNED en deudas.id; la FK debe tener el mismo tipo.
+    deuda_id: Mapped[int] = mapped_column(
+        Integer().with_variant(mysql.INTEGER(unsigned=True), "mysql"),
+        ForeignKey("deudas.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tipo_credito: Mapped[str] = mapped_column(String(40), nullable=False)
 
 
 class CompraTarjeta(Base):

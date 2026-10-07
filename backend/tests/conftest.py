@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 from backend.database import Base, get_db
 from backend.main import app
 from backend.models import CategoriaGasto, TipoDeuda
+from backend.services.tokens import crear_token
 
 # Mismo catálogo ya sembrado en la base real `asistente_financiero` (tablas
 # tipos_deuda y categorias_gasto): se replica aquí porque Base.metadata.create_all
@@ -24,6 +25,7 @@ TIPOS_DEUDA_SEED = [
     ("LIBRE_INVERSION", "Préstamo de libre inversión", "💰"),
     ("PRESTAMO_PERSONAL", "Préstamo personal", "🤝"),
     ("CONSUMO", "Crédito de consumo", "🛒"),
+    ("OTRO", "Otras deudas", "📄"),
 ]
 
 CATEGORIAS_GASTO_SEED = [
@@ -36,6 +38,26 @@ CATEGORIAS_GASTO_SEED = [
     ("COLEGIO", "Pago de colegio", "FAMILIA_EDUCACION"),
     ("UNIVERSIDAD", "Pago de universidad", "FAMILIA_EDUCACION"),
 ]
+
+
+class ClienteConToken(TestClient):
+    """
+    Los tests antiguos indican el usuario con `params={"usuario_id": ...}`. Este cliente lo
+    traduce al encabezado `Authorization: Bearer <token>` de ese usuario, de modo que las
+    pruebas ejercitan la autenticación real. Un test que pase su propio encabezado
+    `Authorization` (o ninguno, sin `usuario_id`) no se toca.
+    """
+
+    def request(self, method, url, **kwargs):
+        params = kwargs.get("params")
+        if params and "usuario_id" in params:
+            params = dict(params)
+            usuario_id = params.pop("usuario_id")
+            kwargs["params"] = params
+            headers = dict(kwargs.get("headers") or {})
+            headers.setdefault("Authorization", f"Bearer {crear_token(int(usuario_id))}")
+            kwargs["headers"] = headers
+        return super().request(method, url, **kwargs)
 
 
 @pytest.fixture()
@@ -61,7 +83,7 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    cliente = TestClient(app)
+    cliente = ClienteConToken(app)
     cliente.session_factory = TestingSessionLocal  # para tests que necesitan tocar la BD directo
     yield cliente
     app.dependency_overrides.clear()

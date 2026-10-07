@@ -36,3 +36,10 @@ class UsuarioOut(BaseModel):
     acepto_terminos_en: datetime | None
     acepto_tratamiento_datos_en: datetime | None
     estado: str
+
+
+class SesionOut(UsuarioOut):
+    """Respuesta de registro e inicio de sesión: el usuario y su token para las demás llamadas."""
+
+    token: str
+    token_type: str = "bearer"

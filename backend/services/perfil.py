@@ -10,10 +10,10 @@ un campo en $0 en el formulario no se guarda como fila, simplemente no existe
 esa fila (y si existía, se borra al volver a poner el campo en 0).
 
 Un usuario se registra con POST /usuarios (con contraseña, guardada solo como
-hash) y entra con POST /usuarios/login. Todavía no hay token de sesión:
-"qué usuario" opera sobre /perfil, /deudas, /meta-ahorro y /analisis se
-indica con `usuario_id` en cada request (ver backend/deps.py), para que con
-varios usuarios registrados cada uno solo vea sus propios datos.
+hash) y entra con POST /usuarios/login. Ambas respuestas traen un token de
+sesión; "qué usuario" opera sobre /perfil, /deudas, /meta-ahorro y /analisis
+se deduce de ese token (ver backend/deps.py), para que con varios usuarios
+registrados cada uno solo vea sus propios datos.
 """
 
 from datetime import datetime
@@ -79,14 +79,6 @@ def autenticar_usuario(db: Session, correo: str, contrasena: str) -> Usuario | N
     if not verificar_contrasena(contrasena, hash_guardado):
         return None
     return usuario
-
-
-def obtener_usuario(db: Session, usuario_id: int) -> Usuario | None:
-    return db.get(Usuario, usuario_id)
-
-
-def listar_usuarios(db: Session) -> list[Usuario]:
-    return db.query(Usuario).order_by(Usuario.id.desc()).all()
 
 
 def _upsert_ingreso(db: Session, usuario_id: int, tipo: str, monto: float) -> None:

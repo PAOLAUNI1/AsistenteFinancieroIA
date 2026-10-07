@@ -1,13 +1,26 @@
 {
   "info": {
     "name": "Asistente Financiero Inteligente - API",
-    "description": "Colección para probar el backend FastAPI (backend/main.py) del proyecto IA_FINANCIERA, conectado a la base MySQL `asistente_financiero`. Levanta la API con `uvicorn backend.main:app --reload` antes de usarla. Corre primero 'Usuarios > Registrar usuario': guarda el id en la variable de colección `usuario_id`, que usan automáticamente el resto de los requests (no hay login todavía, pero cada endpoint de datos exige indicar de qué usuario se trata).",
+    "description": "Colección para probar el backend FastAPI (backend/main.py) del proyecto IA_FINANCIERA, conectado a la base MySQL `asistente_financiero`. Levanta la API con `uvicorn backend.main:app --reload` antes de usarla. Corre primero 'Usuarios > Registrar usuario': guarda el id en la variable de colección `usuario_id`, que usan automáticamente el resto de los requests (no hay login todavía, pero cada endpoint de datos exige indicar de qué usuario se trata).\n\nAutenticación: 'Registrar usuario' o 'Iniciar sesión' guardan el token en la variable de colección `token`; el resto de peticiones lo envían como Bearer.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://127.0.0.1:8000" },
-    { "key": "usuario_id", "value": "" },
-    { "key": "deuda_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "usuario_id",
+      "value": ""
+    },
+    {
+      "key": "deuda_id",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -17,7 +30,18 @@
           "name": "Health check",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
           }
         }
       ]
@@ -33,9 +57,12 @@
               "script": {
                 "exec": [
                   "if (pm.response.code === 201) {",
-                  "    pm.collectionVariables.set('usuario_id', pm.response.json().id);",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.collectionVariables.set('usuario_id', cuerpo.id);",
+                  "    pm.collectionVariables.set('token', cuerpo.token);",
                   "}",
-                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Devuelve un token de sesión', () => pm.expect(pm.response.json().token).to.be.a('string').and.not.empty);"
                 ],
                 "type": "text/javascript"
               }
@@ -43,11 +70,27 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nombre\": \"Juan Camilo Garcia\",\n  \"correo\": \"juancamilo@example.com\",\n  \"contrasena\": \"Segura1234\",\n  \"cantidad_hijos\": 0,\n  \"acepta_terminos\": true,\n  \"acepta_tratamiento_datos\": true\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -59,9 +102,12 @@
               "script": {
                 "exec": [
                   "if (pm.response.code === 200) {",
-                  "    pm.collectionVariables.set('usuario_id', pm.response.json().id);",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.collectionVariables.set('usuario_id', cuerpo.id);",
+                  "    pm.collectionVariables.set('token', cuerpo.token);",
                   "}",
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve un token de sesión', () => pm.expect(pm.response.json().token).to.be.a('string').and.not.empty);"
                 ],
                 "type": "text/javascript"
               }
@@ -69,29 +115,45 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/usuarios/login", "host": ["{{base_url}}"], "path": ["usuarios", "login"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios",
+                "login"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"correo\": \"juancamilo@example.com\",\n  \"contrasena\": \"Segura1234\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
             }
           }
         },
         {
-          "name": "Listar usuarios",
+          "name": "Mi usuario (comprueba que la sesión sigue vigente)",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/usuarios", "host": ["{{base_url}}"], "path": ["usuarios"] }
-          }
-        },
-        {
-          "name": "Obtener usuario por id (chequeo de estado al abrir la app)",
-          "request": {
-            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{base_url}}/usuarios/{{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["usuarios", "{{usuario_id}}"]
+              "raw": "{{base_url}}/usuarios/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios",
+                "me"
+              ]
             }
           }
         }
@@ -104,14 +166,36 @@
           "name": "Listar tipos de deuda",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/tipos-deuda", "host": ["{{base_url}}"], "path": ["tipos-deuda"] }
+            "url": {
+              "raw": "{{base_url}}/tipos-deuda",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tipos-deuda"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
           }
         },
         {
           "name": "Listar categorías de gasto",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/categorias-gasto", "host": ["{{base_url}}"], "path": ["categorias-gasto"] }
+            "url": {
+              "raw": "{{base_url}}/categorias-gasto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categorias-gasto"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
           }
         }
       ]
@@ -124,10 +208,13 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/deudas?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas"
+              ]
             }
           }
         },
@@ -152,12 +239,21 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/hipotecario?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "hipotecario"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/hipotecario",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "hipotecario"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -169,12 +265,21 @@
           "name": "Registrar - Tarjeta de crédito",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/tarjeta?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "tarjeta"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/tarjeta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "tarjeta"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -186,12 +291,21 @@
           "name": "Registrar - Crédito de vehículo",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/vehiculo?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "vehiculo"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/vehiculo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "vehiculo"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -203,16 +317,25 @@
           "name": "Registrar - Crédito educativo",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/educativo?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "educativo"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/educativo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "educativo"
+              ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entidad\": \"ICETEX\",\n  \"carrera\": \"Pregrado Ingeniería\",\n  \"modalidad\": \"En amortización\",\n  \"cuotas_pendientes\": 24,\n  \"monto_inicial\": 15000000,\n  \"saldo_actual\": 8000000,\n  \"tasa\": 9.0,\n  \"periodicidad_tasa\": \"EA\",\n  \"valor_cuota\": 400000,\n  \"proximo_pago\": \"2026-10-01\"\n}"
+              "raw": "{\n  \"entidad\": \"ICETEX\",\n  \"carrera\": \"Pregrado Ingeniería\",\n  \"modalidad\": \"En amortización\",\n  \"monto_inicial\": 15000000,\n  \"saldo_actual\": 8000000,\n  \"tasa\": 9.0,\n  \"periodicidad_tasa\": \"EA\",\n  \"valor_cuota\": 400000,\n  \"proximo_pago\": \"2026-10-01\",\n  \"nombre\": \"Matrícula Universidad CUN\",\n  \"plazo_meses\": 5,\n  \"cuota_proxima\": 1,\n  \"fecha_inicio\": \"2026-09-30\",\n  \"descripcion\": \"Matrícula semestre 2026 - CUN.\",\n  \"activa\": true\n}"
             }
           }
         },
@@ -220,12 +343,21 @@
           "name": "Registrar - Préstamo de libre inversión",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/libre_inversion?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "libre_inversion"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/libre_inversion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "libre_inversion"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -237,12 +369,21 @@
           "name": "Registrar - Préstamo personal",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/prestamo_personal?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "prestamo_personal"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/prestamo_personal",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "prestamo_personal"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -254,12 +395,21 @@
           "name": "Registrar - Crédito de consumo",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/deudas/consumo?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "consumo"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/consumo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "consumo"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -268,14 +418,44 @@
           }
         },
         {
+          "name": "Registrar - Otras deudas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/deudas/otros",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "otros"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entidad\": \"Juan Pérez\",\n  \"tipo_credito\": \"PRESTAMO_FAMILIAR\",\n  \"nombre\": \"Anillo de matrimonio\",\n  \"monto_inicial\": 700000,\n  \"saldo_actual\": 700000,\n  \"tasa\": 0,\n  \"plazo_meses\": 8,\n  \"cuota_proxima\": 1,\n  \"valor_cuota\": 87500,\n  \"fecha_inicio\": \"2026-10-01\",\n  \"proximo_pago\": \"2026-11-01\",\n  \"descripcion\": \"Préstamo familiar para compra de anillo de matrimonio.\",\n  \"activa\": true\n}"
+            }
+          }
+        },
+        {
           "name": "Eliminar deuda (usa deuda_id de la última creada)",
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{base_url}}/deudas/{{deuda_id}}?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["deudas", "{{deuda_id}}"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/deudas/{{deuda_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deudas",
+                "{{deuda_id}}"
+              ]
             }
           }
         }
@@ -289,10 +469,13 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/perfil?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["perfil"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/perfil",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil"
+              ]
             }
           }
         },
@@ -300,12 +483,20 @@
           "name": "Actualizar perfil",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/perfil?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["perfil"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/perfil",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -318,10 +509,13 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/meta-ahorro?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["meta-ahorro"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/meta-ahorro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meta-ahorro"
+              ]
             }
           }
         },
@@ -329,12 +523,20 @@
           "name": "Actualizar meta de ahorro",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/meta-ahorro?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["meta-ahorro"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/meta-ahorro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "meta-ahorro"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -351,12 +553,20 @@
           "name": "Obtener análisis financiero",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{base_url}}/analisis?usuario_id={{usuario_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["analisis"],
-              "query": [{ "key": "usuario_id", "value": "{{usuario_id}}" }]
+              "raw": "{{base_url}}/analisis",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "analisis"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -366,5 +576,15 @@
         }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

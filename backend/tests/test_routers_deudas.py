@@ -45,14 +45,14 @@ def test_registrar_hipotecario_invalido_devuelve_422(client, usuario_id):
     assert respuesta.status_code == 422
 
 
-def test_deudas_requiere_usuario_id(client):
+def test_deudas_requiere_token(client):
     respuesta = client.get("/deudas")
-    assert respuesta.status_code == 422  # falta el query param obligatorio
+    assert respuesta.status_code == 401  # sin sesión no hay datos
 
 
-def test_deudas_con_usuario_inexistente_devuelve_404(client):
+def test_deudas_con_token_de_usuario_inexistente_devuelve_401(client):
     respuesta = client.get("/deudas", params={"usuario_id": 999})
-    assert respuesta.status_code == 404
+    assert respuesta.status_code == 401
 
 
 ACEPTACIONES = {
@@ -281,6 +281,178 @@ def test_vehiculo_con_inicio_posterior_al_proximo_pago_se_rechaza(client, usuari
     assert respuesta.status_code == 422
 
 
+def _educativo(**extra):
+    return {
+        "entidad": "CUN",
+        "nombre": "Matrícula Universidad CUN",
+        "carrera": "Ingeniería de Sistemas",
+        "monto_inicial": 2_752_145,
+        "saldo_actual": 2_752_145,
+        "tasa": 0,
+        "plazo_meses": 5,
+        "cuota_proxima": 1,
+        "valor_cuota": 550_429,
+        "fecha_inicio": "2025-09-30",
+        "proximo_pago": "2025-10-30",
+        "descripcion": "Matrícula semestre 2025 - CUN.",
+        **extra,
+    }
+
+
+def test_educativo_guarda_los_datos_del_diseno_de_la_app(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo", params={"usuario_id": usuario_id}, json=_educativo()
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre"] == "Matrícula Universidad CUN"
+    assert cuerpo["plazo_meses"] == 5
+    assert cuerpo["cuotas_pendientes"] == 5
+    assert cuerpo["tiene_intereses"] is False
+    assert cuerpo["fecha_inicio"] == "2025-09-30"
+    assert cuerpo["detalle"]["programa"] == "Ingeniería de Sistemas"
+    assert cuerpo["detalle"]["institucion"] == "CUN"
+
+
+def test_educativo_con_cuotas_ya_pagadas(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo",
+        params={"usuario_id": usuario_id},
+        json=_educativo(cuota_proxima=3),
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["cuotas_pendientes"] == 3  # 5 - 3 + 1
+
+
+def test_educativo_con_el_contrato_anterior_sigue_funcionando(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo",
+        params={"usuario_id": usuario_id},
+        json={
+            "entidad": "ICETEX",
+            "cuotas_pendientes": 24,
+            "saldo_actual": 4_800_000,
+            "tasa": 5,
+            "valor_cuota": 250_000,
+            "proximo_pago": "2026-10-30",
+        },
+    )
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["plazo_meses"] == 24
+    assert cuerpo["cuotas_pendientes"] == 24
+
+
+def test_educativo_inactivo_queda_cancelado(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo", params={"usuario_id": usuario_id}, json=_educativo(activa=False)
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["estado"] == "CANCELADA"
+
+
+def test_educativo_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo", params={"usuario_id": usuario_id}, json=_educativo(cuota_proxima=6)
+    )
+    assert respuesta.status_code == 422
+
+
+def test_educativo_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo",
+        params={"usuario_id": usuario_id},
+        json=_educativo(saldo_actual=3_000_000),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_educativo_con_inicio_posterior_al_proximo_pago_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/educativo",
+        params={"usuario_id": usuario_id},
+        json=_educativo(fecha_inicio="2026-01-01"),
+    )
+    assert respuesta.status_code == 422
+
+
+def _otros(**extra):
+    return {
+        "entidad": "Juan Pérez",
+        "tipo_credito": "PRESTAMO_FAMILIAR",
+        "nombre": "Anillo de matrimonio",
+        "monto_inicial": 700_000,
+        "saldo_actual": 700_000,
+        "tasa": 0,
+        "plazo_meses": 8,
+        "cuota_proxima": 1,
+        "valor_cuota": 87_500,
+        "fecha_inicio": "2025-10-01",
+        "proximo_pago": "2025-11-01",
+        "descripcion": "Préstamo familiar para compra de anillo de matrimonio.",
+        **extra,
+    }
+
+
+def test_otros_guarda_los_datos_del_diseno_de_la_app(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros()
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["tipo_codigo"] == "OTRO"
+    assert cuerpo["nombre"] == "Anillo de matrimonio"
+    assert cuerpo["entidad"] == "Juan Pérez"
+    assert cuerpo["plazo_meses"] == 8
+    assert cuerpo["cuotas_pendientes"] == 8
+    assert cuerpo["tiene_intereses"] is False
+    assert cuerpo["detalle"]["tipo_credito"] == "PRESTAMO_FAMILIAR"
+
+
+def test_otros_con_tipo_de_credito_desconocido_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/otros",
+        params={"usuario_id": usuario_id},
+        json=_otros(tipo_credito="INVENTADO"),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_otros_inactivo_queda_cancelado(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(activa=False)
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["estado"] == "CANCELADA"
+
+
+def test_otros_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(cuota_proxima=9)
+    )
+    assert respuesta.status_code == 422
+
+
+def test_otros_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(saldo_actual=800_000)
+    )
+    assert respuesta.status_code == 422
+
+
+def test_otros_se_puede_eliminar_con_su_detalle(client, usuario_id):
+    creada = client.post(
+        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros()
+    ).json()
+
+    eliminar = client.delete(f"/deudas/{creada['id']}", params={"usuario_id": usuario_id})
+
+    assert eliminar.status_code == 204
+    assert client.get("/deudas", params={"usuario_id": usuario_id}).json() == []
+
+
 def test_eliminar_deuda(client, usuario_id):
     payload = {
         "prestamista": "Juan Pérez",
@@ -373,6 +545,7 @@ def test_listar_tipos_deuda(client):
         "LIBRE_INVERSION",
         "PRESTAMO_PERSONAL",
         "CONSUMO",
+        "OTRO",
     }
 
 

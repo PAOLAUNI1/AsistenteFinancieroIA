@@ -223,43 +223,122 @@ def validar_vehiculo(
 
 def validar_educativo(
     entidad: str,
-    carrera: str,
-    modalidad: str,
-    cuotas_pendientes: int,
-    monto_inicial: float,
     saldo_actual: float,
     tasa: float,
-    periodicidad_tasa: str,
     valor_cuota: float,
     proximo_pago: date,
+    carrera: str | None = None,
+    modalidad: str = "En amortización",
+    cuotas_pendientes: int | None = None,
+    plazo_meses: int | None = None,
+    cuota_proxima: int = 1,
+    monto_inicial: float = 0,
+    periodicidad_tasa: str = "EA",
+    nombre: str | None = None,
+    fecha_inicio: date | None = None,
+    descripcion: str | None = None,
+    activa: bool = True,
 ) -> dict:
     if not entidad.strip():
         raise ValueError("Ingresa la entidad o institución del crédito educativo.")
     if saldo_actual <= 0:
         raise ValueError("El saldo actual debe ser mayor a cero.")
+    if monto_inicial > 0 and saldo_actual > monto_inicial:
+        raise ValueError("El saldo actual no puede ser mayor al monto inicial.")
     if valor_cuota <= 0:
         raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
+    if fecha_inicio is not None and fecha_inicio > proximo_pago:
+        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+
+    if plazo_meses is None:
+        # Contrato anterior: el plazo total es el número de cuotas por pagar.
+        total_cuotas = cuotas_pendientes or 24
+        proxima_cuota = 1
+    else:
+        total_cuotas = plazo_meses
+        proxima_cuota = cuota_proxima
+    if proxima_cuota > total_cuotas:
+        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
 
     return {
         "base": {
             "entidad": entidad.strip(),
+            "nombre": (nombre or "").strip() or None,
             "monto_inicial": monto_inicial or saldo_actual,
             "saldo_actual": saldo_actual,
             "tiene_intereses": tasa > 0,
             "tasa_interes": tasa,
             "periodicidad_tasa": periodicidad_tasa,
             "tipo_tasa": "FIJA",
-            "plazo_meses": cuotas_pendientes,
+            "plazo_meses": total_cuotas,
             "valor_cuota": valor_cuota,
-            "proxima_cuota": 1,
+            "proxima_cuota": proxima_cuota,
             "fecha_proximo_pago": proximo_pago,
+            "fecha_inicio": fecha_inicio,
+            "descripcion": (descripcion or "").strip() or None,
+            "estado": "ACTIVA" if activa else "CANCELADA",
         },
         "detalle": {
             "institucion": entidad.strip(),
-            "programa": carrera.strip() or None,
+            "programa": (carrera or "").strip() or None,
             "modalidad": modalidad or None,
             "beneficiario": None,
         },
+    }
+
+
+def validar_otros(
+    entidad: str,
+    monto_inicial: float,
+    saldo_actual: float,
+    plazo_meses: int,
+    valor_cuota: float,
+    proximo_pago: date,
+    tipo_credito: str = "OTRO",
+    nombre: str | None = None,
+    tasa: float = 0.0,
+    periodicidad_tasa: str = "EA",
+    cuota_proxima: int = 1,
+    fecha_inicio: date | None = None,
+    descripcion: str | None = None,
+    activa: bool = True,
+) -> dict:
+    if not entidad.strip():
+        raise ValueError("Ingresa la entidad o la persona a quien le debes.")
+    if monto_inicial <= 0:
+        raise ValueError("El monto total de la deuda debe ser mayor a cero.")
+    if saldo_actual <= 0:
+        raise ValueError("El saldo actual debe ser mayor a cero.")
+    if saldo_actual > monto_inicial:
+        raise ValueError("El saldo actual no puede ser mayor al monto total.")
+    if plazo_meses <= 0:
+        raise ValueError("El plazo debe ser mayor a 0 meses.")
+    if cuota_proxima > plazo_meses:
+        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
+    if valor_cuota <= 0:
+        raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
+    if fecha_inicio is not None and fecha_inicio > proximo_pago:
+        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+
+    return {
+        "base": {
+            "entidad": entidad.strip(),
+            "nombre": (nombre or "").strip() or None,
+            "monto_inicial": monto_inicial,
+            "saldo_actual": saldo_actual,
+            "tiene_intereses": tasa > 0,
+            "tasa_interes": tasa,
+            "periodicidad_tasa": periodicidad_tasa,
+            "tipo_tasa": "FIJA",
+            "plazo_meses": plazo_meses,
+            "valor_cuota": valor_cuota,
+            "proxima_cuota": cuota_proxima,
+            "fecha_proximo_pago": proximo_pago,
+            "fecha_inicio": fecha_inicio,
+            "descripcion": (descripcion or "").strip() or None,
+            "estado": "ACTIVA" if activa else "CANCELADA",
+        },
+        "detalle": {"tipo_credito": tipo_credito},
     }
 
 
@@ -393,4 +472,5 @@ VALIDADORES_POR_TIPO = {
     "libre_inversion": ("LIBRE_INVERSION", validar_libre_inversion),
     "prestamo_personal": ("PRESTAMO_PERSONAL", validar_prestamo_personal),
     "consumo": ("CONSUMO", validar_consumo),
+    "otros": ("OTRO", validar_otros),
 }

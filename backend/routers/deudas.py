@@ -9,6 +9,7 @@ from backend.models import (
     CompraTarjeta,
     Deuda,
     DeudaEducativo,
+    DeudaOtro,
     DeudaTarjeta,
     DeudaVehiculo,
     PagoDeuda,
@@ -21,6 +22,7 @@ from backend.schemas.deuda import (
     EducativoIn,
     HipotecarioIn,
     LibreInversionIn,
+    OtrosIn,
     PrestamoPersonalIn,
     TarjetaIn,
     VehiculoIn,
@@ -35,6 +37,7 @@ MODELOS_DETALLE = {
     "TARJETA": DeudaTarjeta,
     "VEHICULO": DeudaVehiculo,
     "EDUCATIVO": DeudaEducativo,
+    "OTRO": DeudaOtro,
 }
 
 
@@ -224,3 +227,16 @@ def registrar_consumo(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return _registrar(db, usuario, "consumo", resultado)
+
+
+@router.post("/otros", response_model=DeudaOut, status_code=201)
+def registrar_otros(
+    payload: OtrosIn,
+    usuario: Usuario = Depends(usuario_actual),
+    db: Session = Depends(get_db),
+):
+    try:
+        resultado = servicio_deudas.validar_otros(**payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _registrar(db, usuario, "otros", resultado)

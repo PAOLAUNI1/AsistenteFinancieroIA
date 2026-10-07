@@ -73,15 +73,46 @@ class VehiculoIn(BaseModel):
 
 class EducativoIn(BaseModel):
     entidad: str
-    carrera: str = ""
+    carrera: str | None = None  # programa o concepto
     modalidad: str = "En amortización"
-    cuotas_pendientes: int = Field(ge=1, le=360, default=24)
+    # Contrato anterior: solo cuotas por pagar (el plazo total era igual a ese valor).
+    cuotas_pendientes: int | None = Field(ge=1, le=360, default=None)
+    # Contrato de la app: plazo total en meses y la próxima cuota a pagar.
+    plazo_meses: int | None = Field(ge=1, le=360, default=None)
+    cuota_proxima: int = Field(ge=1, default=1)
     monto_inicial: float = Field(ge=0, default=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
     periodicidad_tasa: PeriodicidadTasa = "EA"
     valor_cuota: float = Field(gt=0)
     proximo_pago: date
+    nombre: str | None = Field(default=None, max_length=100)
+    fecha_inicio: date | None = None
+    descripcion: str | None = Field(default=None, max_length=200)
+    # False deja la deuda en estado CANCELADA: no cuenta en el análisis.
+    activa: bool = True
+
+
+TipoCreditoOtro = Literal["PRESTAMO_FAMILIAR", "PRESTAMO_AMIGO", "CREDITO_COMERCIO", "OTRO"]
+
+
+class OtrosIn(BaseModel):
+    # Entidad o persona a quien se le debe.
+    entidad: str
+    tipo_credito: TipoCreditoOtro = "OTRO"
+    nombre: str | None = Field(default=None, max_length=100)
+    monto_inicial: float = Field(gt=0)
+    saldo_actual: float = Field(gt=0)
+    tasa: float = Field(ge=0, default=0.0)
+    periodicidad_tasa: PeriodicidadTasa = "EA"
+    plazo_meses: int = Field(ge=1, le=360)
+    cuota_proxima: int = Field(ge=1, default=1)
+    valor_cuota: float = Field(gt=0)
+    fecha_inicio: date | None = None
+    proximo_pago: date
+    descripcion: str | None = Field(default=None, max_length=200)
+    # False deja la deuda en estado CANCELADA: no cuenta en el análisis.
+    activa: bool = True
 
 
 class LibreInversionIn(BaseModel):
