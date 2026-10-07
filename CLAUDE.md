@@ -1034,8 +1034,8 @@ Consumo. Para él (y para cualquier otro tipo nuevo):
 -   Pantalla "Mis deudas" completa ("Ver todas") y calendario de pagos.
 -   Registrar gasto, registrar ahorro y "Analizar con IA".
 -   Camino para que los usuarios antiguos sin contraseña la definan.
--   Límite de intentos de inicio de sesión (contra fuerza bruta) y renovación
-    de tokens.
+-   Renovación de tokens. La app debe mostrar un mensaje propio cuando el login
+    responde 429 (demasiados intentos).
 
 No modificar los flujos ya implementados salvo que aparezca un error o
 el diseño cambie.
@@ -1100,7 +1100,7 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, catalogo)
 ├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad, tokens
-├── tests/             # pytest (87 pruebas)
+├── tests/             # pytest (111 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
@@ -1161,7 +1161,9 @@ alterado, vencido o sin vencimiento: 401; cuenta inactiva: 403. Ya no existe
 el parámetro `usuario_id` ni el listado público de usuarios. Los tests usan
 un cliente que convierte `params={"usuario_id": ...}` en el token de ese
 usuario (`backend/tests/conftest.py`) y `test_autenticacion.py` cubre los
-casos de seguridad. No hay límite de intentos de inicio de sesión (pendiente).
+casos de seguridad. El inicio de sesión se bloquea con 429 (y `Retry-After`) tras 5 contraseñas
+incorrectas por correo o 20 por IP en 15 minutos (`services/limite_intentos.py`,
+en memoria: con varios procesos cada uno llevaría su cuenta).
 
 ## Reglas relevantes
 
@@ -1197,7 +1199,8 @@ python -m pytest backend/tests -q
 Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
 `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD` en local, o `DATABASE_URL`
 (`mysql://usuario:clave@host:puerto/base`) en un servidor en la nube;
-`JWT_SECRET` (obligatoria en un servidor público); opcionales `JWT_DIAS` y
+`JWT_SECRET` (obligatoria con `APP_ENV=production`, de 32 caracteres o más; el
+Dockerfile ya fija `APP_ENV`); opcionales `JWT_DIAS` y
 `BCRYPT_ROUNDS`. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`
 (no se pudo probar localmente: no hay Docker instalado).
 
@@ -1319,7 +1322,7 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 87 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 111 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario.
 -   App: 110 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo), contratos JSON con el backend,

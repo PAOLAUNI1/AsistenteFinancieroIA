@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -11,6 +11,7 @@ from backend.services.perfil import (
     autenticar_usuario,
     crear_usuario,
 )
+from backend.services.limite_intentos import limite_login
 from backend.services.tokens import crear_token
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
@@ -41,11 +42,21 @@ def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=SesionOut)
-def iniciar_sesion(payload: LoginIn, db: Session = Depends(get_db)):
+def iniciar_sesion(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
+    ip = request.client.host if request.client else "desconocida"
+    espera = limite_login.segundos_de_espera(payload.correo, ip)
+    if espera:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos fallidos. Intenta de nuevo más tarde.",
+            headers={"Retry-After": str(espera)},
+        )
     usuario = autenticar_usuario(db, payload.correo, payload.contrasena)
     # Mismo mensaje si el correo no existe o la contraseña es incorrecta.
     if usuario is None:
+        limite_login.registrar_fallo(payload.correo, ip)
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
+    limite_login.registrar_exito(payload.correo)
     if usuario.estado != "ACTIVO":
         raise HTTPException(status_code=403, detail="La cuenta no está activa.")
     return _sesion(usuario)

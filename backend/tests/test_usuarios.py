@@ -218,3 +218,48 @@ def test_registro_simultaneo_con_el_mismo_correo_da_409(client, monkeypatch):
 
     monkeypatch.setattr(perfil.Session, "query", lambda self, *_: _SinResultados(), raising=False)
     assert client.post("/usuarios", json=datos).status_code == 409
+
+
+def _registrar_y_login(client, correo="limite@example.com"):
+    client.post(
+        "/usuarios",
+        json={
+            "nombre": "Ana",
+            "correo": correo,
+            "contrasena": "Segura1234",
+            "acepta_terminos": True,
+            "acepta_tratamiento_datos": True,
+        },
+    )
+
+
+def test_cinco_contrasenas_incorrectas_bloquean_el_login_con_429(client):
+    _registrar_y_login(client)
+    mala = {"correo": "limite@example.com", "contrasena": "incorrecta1"}
+    for _ in range(5):
+        assert client.post("/usuarios/login", json=mala).status_code == 401
+
+    bloqueado = client.post("/usuarios/login", json={"correo": "limite@example.com", "contrasena": "Segura1234"})
+    assert bloqueado.status_code == 429
+    assert int(bloqueado.headers["Retry-After"]) > 0
+
+
+def test_un_login_correcto_reinicia_la_cuenta_de_fallos(client):
+    _registrar_y_login(client)
+    mala = {"correo": "limite@example.com", "contrasena": "incorrecta1"}
+    buena = {"correo": "limite@example.com", "contrasena": "Segura1234"}
+    for _ in range(4):
+        client.post("/usuarios/login", json=mala)
+    assert client.post("/usuarios/login", json=buena).status_code == 200
+    for _ in range(4):
+        assert client.post("/usuarios/login", json=mala).status_code == 401
+    assert client.post("/usuarios/login", json=buena).status_code == 200
+
+
+def test_el_bloqueo_de_un_correo_no_afecta_a_otro(client):
+    _registrar_y_login(client)
+    _registrar_y_login(client, "otro@example.com")
+    for _ in range(5):
+        client.post("/usuarios/login", json={"correo": "limite@example.com", "contrasena": "incorrecta1"})
+    ok = client.post("/usuarios/login", json={"correo": "otro@example.com", "contrasena": "Segura1234"})
+    assert ok.status_code == 200

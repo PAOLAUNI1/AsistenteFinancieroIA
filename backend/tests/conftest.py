@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.database import Base, get_db
 from backend.main import app
+from backend.services.limite_intentos import limite_login
 from backend.models import CategoriaGasto, TipoDeuda
 from backend.services.tokens import crear_token
 
@@ -58,6 +59,13 @@ class ClienteConToken(TestClient):
             headers.setdefault("Authorization", f"Bearer {crear_token(int(usuario_id))}")
             kwargs["headers"] = headers
         return super().request(method, url, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def _limite_de_login_limpio():
+    # El límite de intentos vive en memoria: sin esto los tests se contaminarían entre sí.
+    limite_login.reiniciar()
+    yield
 
 
 @pytest.fixture()
