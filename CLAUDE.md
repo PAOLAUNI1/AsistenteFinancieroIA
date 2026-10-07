@@ -60,9 +60,17 @@ La solución debe diferenciarse de un chatbot genérico mediante datos
 financieros estructurados, reglas de negocio, cálculos, historial,
 seguimiento y recomendaciones específicas.
 
+**Actualización:** el proyecto ya tiene un backend (FastAPI + MySQL) y una
+app Android nativa (Kotlin + Jetpack Compose, marca **FinZen IA**) que lo
+consume. Ver las secciones 40 a 46. El prototipo Streamlit se conserva
+como referencia de las reglas de negocio.
+
 ------------------------------------------------------------------------
 
 ## 3. Tecnología actual
+
+> Esta sección describe el **prototipo Streamlit**. El backend y la app
+> Android están descritos en las secciones 40 a 46.
 
 El prototipo actual utiliza:
 
@@ -425,6 +433,10 @@ Posteriormente se debe implementar almacenamiento permanente, por
 ejemplo mediante SQLite u otra base de datos adecuada.
 
 No adelantar esta etapa antes de estabilizar los siete formularios.
+
+**Estado actual:** la persistencia ya está implementada en el backend con
+**MySQL** (base `asistente_financiero`) mediante SQLAlchemy; ver la
+sección 41. El prototipo Streamlit sigue usando `st.session_state`.
 
 ------------------------------------------------------------------------
 
@@ -827,8 +839,9 @@ Seguir este orden:
 6.  ✅ Completar préstamo de libre inversión.
 7.  ✅ Completar préstamo personal.
 8.  ✅ Completar crédito de consumo.
-9.  ⏳ Centralizar Mis deudas. **(paso actual)**
-10. Persistencia.
+9.  ✅ Centralizar Mis deudas (en la app Android: sección "Mis deudas" del
+    Inicio; falta la pantalla "Ver todas").
+10. ✅ Persistencia (MySQL, sección 41).
 11. Registro de pagos y movimientos.
 12. Cálculo de endeudamiento.
 13. Análisis de sobreendeudamiento.
@@ -836,8 +849,13 @@ Seguir este orden:
 15. IA personalizada.
 16. Alertas y vencimientos.
 17. Pruebas.
-18. Preparación Android.
+18. ⏳ Preparación Android (en curso: la app ya existe, sección 42).
 19. Documentación del trabajo de grado.
+
+**Estado de los siete formularios en la app Android (paso actual):**
+hipotecario ✅, tarjeta de crédito ✅, crédito de vehículo ✅; pendientes
+en la app: educativo, libre inversión, préstamo personal y consumo (sus
+endpoints del backend ya existen). Ver la sección 38.
 
 ------------------------------------------------------------------------
 
@@ -985,29 +1003,41 @@ No debe quedar como una simple interfaz de formularios.
 
 # 38. Próximo paso inmediato
 
-Los **siete formularios de deuda ya están implementados** (hipotecario,
-tarjeta, vehículo, educativo, libre inversión, préstamo personal y
-consumo), cada uno en su propio módulo dentro de `deudas/` y
-registrados en `deudas/__init__.py` mediante `TIPOS_DEUDAS`.
+Los **siete formularios de deuda** existen en el prototipo Streamlit
+(`deudas/`) y los **siete endpoints** existen en el backend. En la **app
+Android** hay tres flujos completos: hipotecario, tarjeta de crédito y
+vehículo.
 
-Pendiente dentro de tarjeta de crédito: el flujo de "agregar compra
-asociada a una tarjeta existente" (sección 16) y el manejo del ciclo de
-facturación según corte/pago (sección 18) aún no están confirmados como
-completos; verificar antes de darlos por cerrados.
+El siguiente trabajo es:
 
-El siguiente trabajo según el orden de la sección 32 es:
+## 1. Completar los cuatro flujos de deuda que faltan en la app
 
-## Centralizar "Mis deudas"
+Educativo, libre inversión, préstamo personal y consumo. Para cada uno:
 
--   Unificar la presentación de los siete tipos de deuda en una sola
-    sección `Mis deudas` (ver formato de ejemplo en la sección 12).
--   Reutilizar los datos ya guardados en `st.session_state.deudas` sin
-    duplicar lógica de formato entre tipos de deuda.
--   Mantener el ícono, etiquetas y formato monetario específicos de
-    cada tipo de deuda.
+-   Recibir el diseño (mockup) del equipo y seguirlo pantalla por
+    pantalla (sección 44).
+-   Ajustar el backend solo si el diseño no pide algo que hoy es
+    obligatorio, o pide algo que no se guarda (patrón usado en
+    hipotecario, tarjeta y vehículo).
+-   Verificar en el emulador y contra MySQL antes de darlo por cerrado.
 
-No modificar los formularios ya implementados salvo que aparezca un
-error.
+## 2. Pendientes ya identificados
+
+-   Tarjeta de crédito: "agregar compra a una tarjeta existente"
+    (secciones 16 y 17; la tabla `compras_tarjeta` existe pero no hay
+    endpoint ni pantalla) y el ciclo de facturación según corte/pago
+    (sección 18). **No están hechos.**
+-   Pago mínimo de la tarjeta: el diseño no lo pide, por eso hoy la
+    tarjeta queda sin cuota y no aparece en "Próximos pagos" ni suma al
+    análisis mensual. Decidir si se pide más adelante (etapa de pagos) o
+    si se estima.
+-   Pantalla "Mis deudas" completa ("Ver todas") y calendario de pagos.
+-   Registrar gasto, registrar ahorro y "Analizar con IA".
+-   Autenticación con token (hoy los endpoints confían en `usuario_id`).
+-   Camino para que los usuarios antiguos sin contraseña la definan.
+
+No modificar los flujos ya implementados salvo que aparezca un error o
+el diseño cambie.
 
 ------------------------------------------------------------------------
 
@@ -1024,3 +1054,269 @@ Debe evolucionar a:
 > financieros, identifica riesgos y genera recomendaciones
 > personalizadas mediante reglas de negocio y técnicas de Inteligencia
 > Artificial.**
+
+------------------------------------------------------------------------
+
+# 40. Arquitectura actual: backend + app Android
+
+``` text
+App Android (FinZen IA)  --HTTP/JSON-->  Backend FastAPI  -->  MySQL
+Kotlin + Jetpack Compose                 routers -> services    asistente_financiero
+                                         -> models (SQLAlchemy)
+```
+
+Hay dos repositorios de trabajo:
+
+-   **Backend** (este repositorio, carpeta `backend/`): FastAPI,
+    SQLAlchemy 2, PyMySQL, Pydantic v2, bcrypt, pytest. Rama de trabajo:
+    `DEV` (remoto `origin`).
+-   **App Android**: `C:\Users\windows\AndroidStudioProjects\FrontAppIA`
+    (todavía **no está en git**). Kotlin 2.2.10, AGP 9.3.3, Compose BOM
+    2026.02.01, Retrofit 3.0.0 + kotlinx-serialization 1.9.0, `minSdk`
+    24, `compileSdk`/`targetSdk` 37, paquete `com.example.frontappia`.
+    Marca visible: **FinZen IA**.
+
+La separación "orquestador / servicio de datos" se mantiene de forma
+**lógica** dentro de un solo proceso: los routers orquestan y los
+services + models hablan con la base de datos.
+
+El prototipo Streamlit (`app.py`, `deudas/`, `modelo.py`,
+`recomendaciones.py`) no se modifica: sigue siendo la referencia de las
+reglas de negocio.
+
+------------------------------------------------------------------------
+
+# 41. Backend (carpeta `backend/`)
+
+## Estructura
+
+``` text
+backend/
+├── main.py            # FastAPI + routers
+├── database.py        # engine MySQL (credenciales en bd.env)
+├── deps.py            # usuario_actual (lee usuario_id)
+├── models.py          # modelos SQLAlchemy
+├── routers/           # usuarios, catalogos, deudas, perfil, analisis
+├── schemas/           # contratos Pydantic (usuario, deuda, perfil, catalogo)
+├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad
+├── tests/             # pytest (59 pruebas)
+└── postman/           # colección AsistenteFinancieroIA.postman_collection.json
+```
+
+## Base de datos
+
+MySQL, base `asistente_financiero`, 13 tablas: `usuarios`, `deudas`,
+`deuda_tarjeta`, `deuda_vehiculo`, `deuda_educativo`, `compras_tarjeta`,
+`pagos_deuda`, `ingresos`, `gastos`, `categorias_gasto`, `metas_ahorro`,
+`aportes_meta`, `tipos_deuda`.
+
+-   `deudas` es la tabla base común a los siete tipos; `deuda_tarjeta`,
+    `deuda_vehiculo` y `deuda_educativo` guardan el detalle propio de
+    cada tipo (relación 1:1).
+-   Columnas agregadas a `deudas` durante el desarrollo de la app:
+    `nombre`, `fecha_inicio`, `descripcion` (se ejecutó `ALTER TABLE` en
+    la base de desarrollo).
+-   `tipos_deuda` tiene los siete códigos: `HIPOTECARIO`, `TARJETA`,
+    `VEHICULO`, `EDUCATIVO`, `LIBRE_INVERSION`, `PRESTAMO_PERSONAL`,
+    `CONSUMO`.
+-   Las credenciales viven en `bd.env` (`DB_HOST`, `DB_PORT`,
+    `DB_NAME`, `DB_USER`, `DB_PASSWORD`), que **no se sube a git**.
+-   **Pendiente:** el repositorio no tiene aún un script `schema.sql` /
+    `seed.sql` con tablas y catálogos; `create_all` crea las tablas pero
+    no llena los catálogos ni aplica los `ALTER`. Es necesario antes de
+    que otras personas levanten el proyecto.
+
+## Endpoints
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/health` | Estado del servicio |
+| POST | `/usuarios` | Registro (exige aceptar términos y tratamiento de datos) |
+| POST | `/usuarios/login` | Inicio de sesión con contraseña |
+| GET | `/usuarios`, `/usuarios/{id}` | Consulta de usuarios |
+| GET | `/tipos-deuda`, `/categorias-gasto` | Catálogos |
+| GET | `/deudas` | Deudas del usuario |
+| POST | `/deudas/{hipotecario,tarjeta,vehiculo,educativo,libre_inversion,prestamo_personal,consumo}` | Registrar deuda de cada tipo |
+| DELETE | `/deudas/{id}` | Eliminar deuda |
+| GET/PUT | `/perfil` | Ingresos, gastos y datos familiares |
+| GET/PUT | `/meta-ahorro` | Meta de ahorro |
+| POST | `/analisis` | Resumen financiero (ingresos, gastos, disponible, deuda) |
+
+Todos los endpoints de datos reciben `usuario_id` como parámetro de
+consulta y solo devuelven datos de ese usuario. **Todavía no hay
+tokens**: el inicio de sesión solo controla la entrada a la app.
+
+## Reglas relevantes
+
+-   Contraseña: de 8 a 72 bytes, guardada con **bcrypt**
+    (`BCRYPT_ROUNDS`; las pruebas usan 4). Login: 200 si es correcto, 401
+    (mismo mensaje para correo o contraseña incorrectos), 403 si la
+    cuenta no está activa.
+-   Estados de una deuda: `ACTIVA`, `PAGADA`, `CANCELADA`. Si el
+    registro llega con `activa=false` queda `CANCELADA` y no cuenta en el
+    análisis.
+-   `cuotas_pendientes = plazo_meses - proxima_cuota + 1`. La app envía
+    `cuota_proxima = cuotas_pagadas + 1`.
+-   **Hipotecario / vehículo:** aceptan `nombre`, `fecha_inicio`,
+    `descripcion`, `activa`; la fecha de inicio no puede ser posterior al
+    próximo pago. Vehículo guarda `tipo_vehiculo = "OTRO"` cuando no se
+    indica.
+-   **Tarjeta:** `pago_minimo`, `cuota_manejo`, `franquicia` y
+    `proximo_pago` son opcionales. Si no llega `proximo_pago`, se calcula
+    con `dia_pago` (función `proxima_fecha_de_pago`, ajustada al último
+    día del mes). Sin pago mínimo, `valor_cuota` queda nulo.
+    Validaciones: saldo > 0, saldo <= cupo.
+-   `saldo_actual` de las deudas con cuotas no puede superar el monto
+    inicial.
+
+## Cómo ejecutar y probar
+
+``` bash
+python -m uvicorn backend.main:app --port 8000
+python -m pytest backend/tests -q
+```
+
+La documentación interactiva queda en `/docs`. Las pruebas usan SQLite
+en memoria con los catálogos sembrados, sin tocar MySQL.
+
+------------------------------------------------------------------------
+
+# 42. App Android (FinZen IA)
+
+## Flujos construidos
+
+1.  **Bienvenida** → "Crear mi cuenta" o "Iniciar sesión".
+2.  **Registro** (2 pasos): datos personales (nombre, correo,
+    contraseña, cantidad de hijos) y permisos (términos y tratamiento de
+    datos, ambos obligatorios) → Cargando → Éxito. Llama a
+    `POST /usuarios`.
+3.  **Inicio de sesión**: correo y contraseña reales (`POST
+    /usuarios/login`).
+4.  **Inicio**: saludo, balance del mes (ingresos, gastos, disponible,
+    ahorro), acciones rápidas, **Mis deudas** (hasta 3), **Próximos
+    pagos** (hasta 3) y barra inferior. Los botones de pantallas aún no
+    construidas muestran "Próximamente".
+5.  **Registrar deuda**: lista de tipos (desde `/tipos-deuda`) y el flujo
+    de cada tipo; ver la tabla siguiente.
+6.  **Detalle de la deuda**.
+
+La sesión vive **solo en memoria** (decisión del usuario): al cerrar la
+app siempre se abre en Bienvenida.
+
+## Flujos de registro de deuda
+
+| Tipo | Pasos | Particularidades |
+|------|-------|------------------|
+| Hipotecario | Básica → Pago → Adicional → Confirmar | El saldo no se pide: se estima por amortización (EA). Detalle con avance por cuotas |
+| Tarjeta de crédito | Entidad (lista con buscador) → Datos → Adicional → Confirmar | Tasa mensual; día de corte y de pago con selector de día; no pide pago mínimo ni franquicia. Detalle sin cuotas; fila de Inicio con barra de uso, límite y disponible |
+| Vehículo | Básica (entidad en lista desplegable) → Pago → Adicional → Confirmar | El saldo lo escribe la persona; periodicidad de la cuota solo "Mensual"; próxima fecha de pago en el paso 2 |
+
+Educativo, libre inversión, préstamo personal y consumo: **pendientes en
+la app** (los endpoints ya existen).
+
+Pantalla de confirmación → "Registrando…" → éxito → "Ir a mis deudas"
+(abre el detalle) o "Volver al inicio".
+
+## Estructura del código (`app/src/main/java/com/example/frontappia/`)
+
+``` text
+MainActivity.kt
+data/            # Modelos, repositorios (Usuario, Finanzas, Deudas), ejecutarApi
+data/remote/     # Retrofit: ApiClient, *Api, *Dtos (snake_case con @SerialName)
+ui/              # FinZenApp (navegación por enum Pantalla), FinZenViewModel, Mensajes
+ui/components/   # campos y botones comunes (dinero, fecha, día, lista, contraseña)
+ui/registro/     # bienvenida, datos personales, permisos, cargando, éxito
+ui/login/        # inicio de sesión
+ui/home/         # Inicio, componentes, formatos
+ui/deuda/        # un archivo de formulario + pasos + confirmación por tipo,
+                 # RegistroDeudaFlow, TipoDeudaScreen, Detalle*
+ui/theme/        # colores y tipografía
+```
+
+-   Un único `FinZenViewModel` con `StateFlow` para usuario, registro,
+    login, Inicio, tipos, formularios (uno por tipo de deuda), registro
+    de deuda y deuda seleccionada.
+-   Los formularios guardan texto tal cual lo escribe la persona; los
+    cálculos y validaciones convierten al vuelo (reflejan las reglas del
+    backend).
+-   Los errores de red se traducen en `ErrorApi` (conflicto, no
+    encontrado, datos inválidos, credenciales, cuenta inactiva, sin
+    conexión).
+-   El flujo de deudas usa `TipoFlujo` (Hipoteca, Tarjeta, Vehiculo) para
+    saber a qué pantalla volver y qué enviar.
+
+## Compilar y ejecutar
+
+-   `JAVA_HOME` = JDK que trae Android Studio (carpeta `jbr`).
+-   `gradlew.bat :app:testDebugUnitTest :app:assembleDebug`
+-   `API_BASE_URL` de depuración: `http://127.0.0.1:8000/` con
+    `adb reverse tcp:8000 tcp:8000` (en el emulador o en el celular);
+    hay una `network_security_config` solo para depuración que permite
+    HTTP a `127.0.0.1`, `localhost` y `10.0.2.2`.
+-   Para otro puerto del backend: `adb reverse tcp:8000 tcp:<puerto>`.
+
+------------------------------------------------------------------------
+
+# 43. Trabajo con diseños (mockups) del equipo
+
+-   Los diseños llegan como imágenes de flujo de 10 pantallas. **Se
+    siguen fielmente** (textos, orden de campos, colores).
+-   Si el diseño **no pide** un dato que el backend exige, se hace
+    opcional en el backend con un valor por defecto razonable y se
+    documenta aquí (ejemplos: pago mínimo y franquicia de la tarjeta,
+    tipo de vehículo).
+-   Si el diseño **pide** algo que no se guarda, se agrega la columna
+    (ejemplos: `nombre`, `fecha_inicio`, `descripcion`).
+-   Las listas de entidades financieras llevan **solo nombres, sin
+    logos** (decisión del usuario). "Otra entidad" abre un campo de
+    texto.
+-   Los porcentajes de tasa se muestran con dos decimales en vehículo y
+    tarjeta (`14,50%`).
+-   La fila de "Mis deudas" muestra "Saldo actual" (diseño más reciente)
+    para las deudas con cuotas y una barra de uso del cupo para tarjetas.
+-   Cada flujo se verifica en el emulador contra MySQL real y se limpia
+    **solo** el usuario de prueba propio (nunca los usuarios reales del
+    equipo).
+
+------------------------------------------------------------------------
+
+# 44. Pruebas
+
+-   Backend: 59 pruebas de pytest (`backend/tests`): servicios de
+    deudas, endpoints, registro, login, aislamiento por usuario.
+-   App: 71 pruebas unitarias (`app/src/test`): validaciones, formularios
+    (hipotecario, tarjeta, vehículo), contratos JSON con el backend,
+    repositorios, formatos de moneda y fecha.
+-   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
+    (instalación vía USB). Cada flujo nuevo se recorre completo hasta
+    "Mis deudas".
+
+------------------------------------------------------------------------
+
+# 45. Entorno de desarrollo (máquina de Juan)
+
+-   Python 3.14 y MySQL 8 instalados localmente; ninguno está en el
+    `PATH`.
+-   `adb` en `...\Android\Sdk\platform-tools`, emulador en
+    `...\Android\Sdk\emulator` (AVD `Medium_Phone`).
+-   El Xiaomi necesita "Instalar vía USB" habilitado.
+-   Detalles del emulador al automatizar pruebas: `adb input text` no
+    escribe tildes y a veces duplica teclas; el arranque en frío de la
+    app es lento, por lo que conviene avanzar paso a paso.
+
+------------------------------------------------------------------------
+
+# 46. Pendientes transversales
+
+-   Script de base de datos (`schema.sql`, `seed.sql`, `bd.env.example`) y
+    guía para que el equipo levante el proyecto; evaluar un servidor
+    compartido (MySQL gestionado + backend desplegado) cuando haya que
+    probar la app entre varias personas.
+-   Autenticación con token y camino para definir contraseña a usuarios
+    anteriores.
+-   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
+    el saldo real y los vencimientos).
+-   Cálculo de endeudamiento y sobreendeudamiento, motor de
+    recomendaciones, IA personalizada, alertas y vencimientos (pasos 12 a
+    16 de la sección 32).
+-   Poner la app Android bajo control de versiones.
