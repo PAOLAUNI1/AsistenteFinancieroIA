@@ -37,3 +37,36 @@ def test_sin_database_url_se_usan_las_variables_db(monkeypatch):
 
     assert url.password == "p@ss word:1"  # los caracteres especiales sobreviven al armado
     assert (url.host, url.database) == ("127.0.0.1", "asistente")
+
+
+def test_en_produccion_sin_jwt_secret_no_arranca(monkeypatch):
+    import pytest
+
+    from backend.services import tokens
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    with pytest.raises(RuntimeError):
+        tokens._cargar_clave()
+
+    monkeypatch.setenv("JWT_SECRET", "corta")
+    with pytest.raises(RuntimeError):
+        tokens._cargar_clave()
+
+    monkeypatch.setenv("JWT_SECRET", "x" * 32)
+    assert tokens._cargar_clave() == "x" * 32
+
+
+def test_fuera_de_produccion_sin_jwt_secret_usa_clave_temporal(monkeypatch):
+    from backend.services import tokens
+
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    assert len(tokens._cargar_clave()) >= tokens.LARGO_MINIMO_CLAVE
+
+
+def test_jwt_dias_con_basura_usa_30(monkeypatch):
+    from backend.services import tokens
+
+    monkeypatch.setenv("JWT_DIAS", "abc")
+    assert tokens._dias_de_vida() == 30
