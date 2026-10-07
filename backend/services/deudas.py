@@ -162,11 +162,15 @@ def validar_vehiculo(
     valor_cuota: float,
     cuota_proxima: int,
     proximo_pago: date,
-    tipo_vehiculo: str,
-    marca: str | None,
-    modelo: str | None,
-    anio: int | None,
-    placa: str | None,
+    tipo_vehiculo: str = "OTRO",
+    marca: str | None = None,
+    modelo: str | None = None,
+    anio: int | None = None,
+    placa: str | None = None,
+    nombre: str | None = None,
+    fecha_inicio: date | None = None,
+    descripcion: str | None = None,
+    activa: bool = True,
 ) -> dict:
     plazo_meses = (anos * 12) + meses
 
@@ -180,12 +184,17 @@ def validar_vehiculo(
         raise ValueError("El saldo actual no puede ser mayor al monto financiado.")
     if plazo_meses <= 0:
         raise ValueError("El plazo del crédito debe ser mayor a 0 meses.")
+    if cuota_proxima > plazo_meses:
+        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
     if valor_cuota <= 0:
         raise ValueError("El valor de la cuota debe ser mayor a cero.")
+    if fecha_inicio is not None and fecha_inicio > proximo_pago:
+        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
 
     return {
         "base": {
             "entidad": entidad.strip(),
+            "nombre": (nombre or "").strip() or None,
             "monto_inicial": monto_inicial,
             "saldo_actual": saldo_actual,
             "tiene_intereses": tasa > 0,
@@ -196,6 +205,9 @@ def validar_vehiculo(
             "valor_cuota": valor_cuota,
             "proxima_cuota": cuota_proxima,
             "fecha_proximo_pago": proximo_pago,
+            "fecha_inicio": fecha_inicio,
+            "descripcion": (descripcion or "").strip() or None,
+            "estado": "ACTIVA" if activa else "CANCELADA",
         },
         "detalle": {
             "tipo_vehiculo": tipo_vehiculo,

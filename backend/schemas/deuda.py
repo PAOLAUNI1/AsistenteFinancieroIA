@@ -58,11 +58,17 @@ class VehiculoIn(BaseModel):
     valor_cuota: float = Field(gt=0)
     cuota_proxima: int = Field(ge=1, default=1)
     proximo_pago: date
-    tipo_vehiculo: Literal["AUTOMOVIL", "MOTOCICLETA", "CAMIONETA", "OTRO"] = "AUTOMOVIL"
+    # "OTRO" cuando no se indica: la app móvil no pregunta por el tipo de vehículo.
+    tipo_vehiculo: Literal["AUTOMOVIL", "MOTOCICLETA", "CAMIONETA", "OTRO"] = "OTRO"
     marca: str | None = None
     modelo: str | None = None
     anio: int | None = Field(default=None, ge=1950, le=2100)
     placa: str | None = None
+    nombre: str | None = Field(default=None, max_length=100)
+    fecha_inicio: date | None = None
+    descripcion: str | None = Field(default=None, max_length=200)
+    # False deja la deuda en estado CANCELADA: no cuenta en el análisis.
+    activa: bool = True
 
 
 class EducativoIn(BaseModel):

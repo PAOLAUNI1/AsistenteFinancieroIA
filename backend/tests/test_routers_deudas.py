@@ -213,6 +213,74 @@ def test_tarjeta_descripcion_demasiado_larga_se_rechaza(client, usuario_id):
     assert respuesta.status_code == 422
 
 
+def _vehiculo(**extra):
+    return {
+        "entidad": "Bancolombia",
+        "nombre": "Crédito vehículo",
+        "monto_inicial": 45_000_000,
+        "saldo_actual": 32_500_000,
+        "tasa": 14.5,
+        "anos": 5,
+        "meses": 0,
+        "valor_cuota": 950_000,
+        "cuota_proxima": 16,
+        "proximo_pago": "2026-10-10",
+        "fecha_inicio": "2024-01-10",
+        "descripcion": "Crédito para vehículo Mazda CX-5, modelo 2024.",
+        **extra,
+    }
+
+
+def test_vehiculo_guarda_los_datos_del_diseno_de_la_app(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/vehiculo", params={"usuario_id": usuario_id}, json=_vehiculo()
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre"] == "Crédito vehículo"
+    assert cuerpo["saldo_actual"] == 32_500_000
+    assert cuerpo["plazo_meses"] == 60
+    assert cuerpo["cuotas_pendientes"] == 45
+    assert cuerpo["fecha_inicio"] == "2024-01-10"
+    assert cuerpo["descripcion"].startswith("Crédito para vehículo")
+    assert cuerpo["estado"] == "ACTIVA"
+    assert cuerpo["detalle"]["tipo_vehiculo"] == "OTRO"  # la app no pregunta el tipo
+
+
+def test_vehiculo_inactivo_queda_cancelado(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/vehiculo", params={"usuario_id": usuario_id}, json=_vehiculo(activa=False)
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["estado"] == "CANCELADA"
+
+
+def test_vehiculo_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/vehiculo",
+        params={"usuario_id": usuario_id},
+        json=_vehiculo(saldo_actual=46_000_000),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_vehiculo_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/vehiculo", params={"usuario_id": usuario_id}, json=_vehiculo(cuota_proxima=61)
+    )
+    assert respuesta.status_code == 422
+
+
+def test_vehiculo_con_inicio_posterior_al_proximo_pago_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/vehiculo",
+        params={"usuario_id": usuario_id},
+        json=_vehiculo(fecha_inicio="2026-12-01"),
+    )
+    assert respuesta.status_code == 422
+
+
 def test_eliminar_deuda(client, usuario_id):
     payload = {
         "prestamista": "Juan Pérez",

@@ -195,7 +195,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entidad\": \"Sufi Bancolombia\",\n  \"monto_inicial\": 40000000,\n  \"saldo_actual\": 30000000,\n  \"tasa\": 14.5,\n  \"periodicidad_tasa\": \"EA\",\n  \"anos\": 5,\n  \"meses\": 0,\n  \"valor_cuota\": 900000,\n  \"cuota_proxima\": 10,\n  \"proximo_pago\": \"2026-10-01\",\n  \"tipo_vehiculo\": \"AUTOMOVIL\",\n  \"marca\": \"Mazda\",\n  \"modelo\": \"CX-30\",\n  \"anio\": 2023,\n  \"placa\": \"ABC123\"\n}"
+              "raw": "{\n  \"entidad\": \"Sufi Bancolombia\",\n  \"monto_inicial\": 40000000,\n  \"saldo_actual\": 30000000,\n  \"tasa\": 14.5,\n  \"periodicidad_tasa\": \"EA\",\n  \"anos\": 5,\n  \"meses\": 0,\n  \"valor_cuota\": 900000,\n  \"cuota_proxima\": 10,\n  \"proximo_pago\": \"2026-10-01\",\n  \"tipo_vehiculo\": \"AUTOMOVIL\",\n  \"marca\": \"Mazda\",\n  \"modelo\": \"CX-30\",\n  \"anio\": 2023,\n  \"placa\": \"ABC123\",\n  \"nombre\": \"Crédito vehículo\",\n  \"fecha_inicio\": \"2024-01-10\",\n  \"descripcion\": \"Crédito para vehículo Mazda CX-5, modelo 2024.\",\n  \"activa\": true\n}"
             }
           }
         },
