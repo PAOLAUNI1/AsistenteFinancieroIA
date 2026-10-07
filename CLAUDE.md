@@ -853,9 +853,9 @@ Seguir este orden:
 19. Documentación del trabajo de grado.
 
 **Estado de los siete formularios en la app Android (paso actual):**
-hipotecario ✅, tarjeta de crédito ✅, crédito de vehículo ✅; pendientes
-en la app: educativo, libre inversión, préstamo personal y consumo (sus
-endpoints del backend ya existen). Ver la sección 38.
+hipotecario ✅, tarjeta de crédito ✅, crédito de vehículo ✅, educación ✅,
+otros ✅; pendiente en la app: consumo (el endpoint ya existe). Libre
+inversión y préstamo personal no se muestran en la app. Ver la sección 38.
 
 ------------------------------------------------------------------------
 
@@ -1004,15 +1004,15 @@ No debe quedar como una simple interfaz de formularios.
 # 38. Próximo paso inmediato
 
 Los **siete formularios de deuda** existen en el prototipo Streamlit
-(`deudas/`) y los **siete endpoints** existen en el backend. En la **app
-Android** hay tres flujos completos: hipotecario, tarjeta de crédito y
-vehículo.
+(`deudas/`) y los **ocho endpoints** existen en el backend. En la **app
+Android** hay cinco flujos completos: hipotecario, tarjeta de crédito,
+vehículo, educación y otros.
 
 El siguiente trabajo es:
 
-## 1. Completar los cuatro flujos de deuda que faltan en la app
+## 1. Completar el flujo de deuda que falta en la app
 
-Educativo, libre inversión, préstamo personal y consumo. Para cada uno:
+Consumo. Para él (y para cualquier otro tipo nuevo):
 
 -   Recibir el diseño (mockup) del equipo y seguirlo pantalla por
     pantalla (sección 44).
@@ -1033,8 +1033,9 @@ Educativo, libre inversión, préstamo personal y consumo. Para cada uno:
     si se estima.
 -   Pantalla "Mis deudas" completa ("Ver todas") y calendario de pagos.
 -   Registrar gasto, registrar ahorro y "Analizar con IA".
--   Autenticación con token (hoy los endpoints confían en `usuario_id`).
 -   Camino para que los usuarios antiguos sin contraseña la definan.
+-   Límite de intentos de inicio de sesión (contra fuerza bruta) y renovación
+    de tokens.
 
 No modificar los flujos ya implementados salvo que aparezca un error o
 el diseño cambie.
@@ -1094,21 +1095,25 @@ reglas de negocio.
 backend/
 ├── main.py            # FastAPI + routers
 ├── database.py        # engine MySQL (credenciales en bd.env)
-├── deps.py            # usuario_actual (lee usuario_id)
+├── deps.py            # usuario_actual (lee el token Bearer)
 ├── models.py          # modelos SQLAlchemy
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, catalogo)
-├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad
-├── tests/             # pytest (59 pruebas)
+├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad, tokens
+├── tests/             # pytest (87 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
+db/
+├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
+└── seed.sql           # catálogos: tipos de deuda y categorías de gasto
+Dockerfile, .dockerignore, bd.env.example   # despliegue y configuración
 ```
 
 ## Base de datos
 
-MySQL, base `asistente_financiero`, 13 tablas: `usuarios`, `deudas`,
-`deuda_tarjeta`, `deuda_vehiculo`, `deuda_educativo`, `compras_tarjeta`,
-`pagos_deuda`, `ingresos`, `gastos`, `categorias_gasto`, `metas_ahorro`,
-`aportes_meta`, `tipos_deuda`.
+MySQL, base `asistente_financiero`, 14 tablas: `usuarios`, `deudas`,
+`deuda_tarjeta`, `deuda_vehiculo`, `deuda_educativo`, `deuda_otro`,
+`compras_tarjeta`, `pagos_deuda`, `ingresos`, `gastos`, `categorias_gasto`,
+`metas_ahorro`, `aportes_meta`, `tipos_deuda`.
 
 -   `deudas` es la tabla base común a los siete tipos; `deuda_tarjeta`,
     `deuda_vehiculo` y `deuda_educativo` guardan el detalle propio de
@@ -1116,35 +1121,47 @@ MySQL, base `asistente_financiero`, 13 tablas: `usuarios`, `deudas`,
 -   Columnas agregadas a `deudas` durante el desarrollo de la app:
     `nombre`, `fecha_inicio`, `descripcion` (se ejecutó `ALTER TABLE` en
     la base de desarrollo).
--   `tipos_deuda` tiene los siete códigos: `HIPOTECARIO`, `TARJETA`,
+-   `tipos_deuda` tiene ocho códigos: `HIPOTECARIO`, `TARJETA`,
     `VEHICULO`, `EDUCATIVO`, `LIBRE_INVERSION`, `PRESTAMO_PERSONAL`,
-    `CONSUMO`.
+    `CONSUMO` y `OTRO` ("Otras deudas", con su detalle en `deuda_otro`).
+    La app solo ofrece seis: hipotecario, tarjeta, consumo, vehículo,
+    educación y otro (el diseño no muestra libre inversión ni préstamo
+    personal; sus endpoints siguen existiendo).
 -   Las credenciales viven en `bd.env` (`DB_HOST`, `DB_PORT`,
     `DB_NAME`, `DB_USER`, `DB_PASSWORD`), que **no se sube a git**.
--   **Pendiente:** el repositorio no tiene aún un script `schema.sql` /
-    `seed.sql` con tablas y catálogos; `create_all` crea las tablas pero
-    no llena los catálogos ni aplica los `ALTER`. Es necesario antes de
-    que otras personas levanten el proyecto.
+-   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
+    restricciones) y luego `db/seed.sql` (catálogos); verificado sobre una
+    base vacía: 14 tablas, 8 tipos de deuda y 8 categorías. Si la
+    estructura cambia, se regeneran con `mysqldump --no-data` (ver cómo en
+    el historial del proyecto) y se actualizan los modelos a mano.
 
 ## Endpoints
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/health` | Estado del servicio |
-| POST | `/usuarios` | Registro (exige aceptar términos y tratamiento de datos) |
-| POST | `/usuarios/login` | Inicio de sesión con contraseña |
-| GET | `/usuarios`, `/usuarios/{id}` | Consulta de usuarios |
+| POST | `/usuarios` | Registro (exige aceptar términos y tratamiento de datos); devuelve el usuario y su `token` |
+| POST | `/usuarios/login` | Inicio de sesión con contraseña; devuelve el usuario y su `token` |
+| GET | `/usuarios/me` | El usuario dueño del token |
 | GET | `/tipos-deuda`, `/categorias-gasto` | Catálogos |
 | GET | `/deudas` | Deudas del usuario |
-| POST | `/deudas/{hipotecario,tarjeta,vehiculo,educativo,libre_inversion,prestamo_personal,consumo}` | Registrar deuda de cada tipo |
+| POST | `/deudas/{hipotecario,tarjeta,vehiculo,educativo,libre_inversion,prestamo_personal,consumo,otros}` | Registrar deuda de cada tipo |
 | DELETE | `/deudas/{id}` | Eliminar deuda |
 | GET/PUT | `/perfil` | Ingresos, gastos y datos familiares |
 | GET/PUT | `/meta-ahorro` | Meta de ahorro |
 | POST | `/analisis` | Resumen financiero (ingresos, gastos, disponible, deuda) |
 
-Todos los endpoints de datos reciben `usuario_id` como parámetro de
-consulta y solo devuelven datos de ese usuario. **Todavía no hay
-tokens**: el inicio de sesión solo controla la entrada a la app.
+**Autenticación:** los endpoints de datos (`/deudas`, `/perfil`,
+`/meta-ahorro`, `/analisis`, `/usuarios/me`) exigen
+`Authorization: Bearer <token>` y solo devuelven datos del dueño del token.
+El token es un JWT (HS256) firmado con la variable de entorno `JWT_SECRET`
+(si falta, se genera una clave temporal al arrancar y las sesiones se pierden
+al reiniciar) y dura `JWT_DIAS` días (30 por defecto). Sin token, con token
+alterado, vencido o sin vencimiento: 401; cuenta inactiva: 403. Ya no existe
+el parámetro `usuario_id` ni el listado público de usuarios. Los tests usan
+un cliente que convierte `params={"usuario_id": ...}` en el token de ese
+usuario (`backend/tests/conftest.py`) y `test_autenticacion.py` cubre los
+casos de seguridad. No hay límite de intentos de inicio de sesión (pendiente).
 
 ## Reglas relevantes
 
@@ -1172,9 +1189,17 @@ tokens**: el inicio de sesión solo controla la entrada a la app.
 ## Cómo ejecutar y probar
 
 ``` bash
+pip install -r backend/requirements.txt
 python -m uvicorn backend.main:app --port 8000
 python -m pytest backend/tests -q
 ```
+
+Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
+`DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD` en local, o `DATABASE_URL`
+(`mysql://usuario:clave@host:puerto/base`) en un servidor en la nube;
+`JWT_SECRET` (obligatoria en un servidor público); opcionales `JWT_DIAS` y
+`BCRYPT_ROUNDS`. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`
+(no se pudo probar localmente: no hay Docker instalado).
 
 La documentación interactiva queda en `/docs`. Las pruebas usan SQLite
 en memoria con los catálogos sembrados, sin tocar MySQL.
@@ -1201,7 +1226,12 @@ en memoria con los catálogos sembrados, sin tocar MySQL.
 6.  **Detalle de la deuda**.
 
 La sesión vive **solo en memoria** (decisión del usuario): al cerrar la
-app siempre se abre en Bienvenida.
+app siempre se abre en Bienvenida. El token de la sesión (`SesionToken`) también
+está solo en memoria y un interceptor de OkHttp lo envía como `Bearer` en cada
+llamada. Si el servidor responde 401 en una llamada con sesión (token vencido o
+servidor reiniciado con otra clave) la app muestra "Tu sesión venció" y vuelve
+a Bienvenida; en el inicio de sesión un 401 sigue significando "correo o
+contraseña incorrectos".
 
 ## Flujos de registro de deuda
 
@@ -1210,9 +1240,13 @@ app siempre se abre en Bienvenida.
 | Hipotecario | Básica → Pago → Adicional → Confirmar | El saldo no se pide: se estima por amortización (EA). Detalle con avance por cuotas |
 | Tarjeta de crédito | Entidad (lista con buscador) → Datos → Adicional → Confirmar | Tasa mensual; día de corte y de pago con selector de día; no pide pago mínimo ni franquicia. Detalle sin cuotas; fila de Inicio con barra de uso, límite y disponible |
 | Vehículo | Básica (entidad en lista desplegable) → Pago → Adicional → Confirmar | El saldo lo escribe la persona; periodicidad de la cuota solo "Mensual"; próxima fecha de pago en el paso 2 |
+| Educación | Básica (entidad educativa, programa, monto, saldo, tasa, plazo en meses) → Pago → Adicional → Confirmar | Tasa 0 por defecto; plazo total en meses y cuotas pagadas |
+| Otros | Básica (entidad o persona, tipo de otro crédito) → Pago → Adicional → Confirmar | Tipo nuevo `OTRO`; el subtítulo muestra "Juan Pérez (familiar)" |
 
-Educativo, libre inversión, préstamo personal y consumo: **pendientes en
-la app** (los endpoints ya existen).
+La lista de tipos de la app muestra solo seis, en este orden: Hipotecario,
+Tarjeta de crédito, Consumo, Vehículo, Educación y Otro. **Consumo** aún no
+tiene flujo en la app (muestra "Próximamente"); libre inversión y préstamo
+personal no se ofrecen en la app.
 
 Pantalla de confirmación → "Registrando…" → éxito → "Ir a mis deudas"
 (abre el detalle) o "Volver al inicio".
@@ -1242,14 +1276,17 @@ ui/theme/        # colores y tipografía
 -   Los errores de red se traducen en `ErrorApi` (conflicto, no
     encontrado, datos inválidos, credenciales, cuenta inactiva, sin
     conexión).
--   El flujo de deudas usa `TipoFlujo` (Hipoteca, Tarjeta, Vehiculo) para
-    saber a qué pantalla volver y qué enviar.
+-   El flujo de deudas usa `TipoFlujo` (Hipoteca, Tarjeta, Vehiculo,
+    Educativo, Otros) para saber a qué pantalla volver y qué enviar.
 
 ## Compilar y ejecutar
 
 -   `JAVA_HOME` = JDK que trae Android Studio (carpeta `jbr`).
 -   `gradlew.bat :app:testDebugUnitTest :app:assembleDebug`
--   `API_BASE_URL` de depuración: `http://127.0.0.1:8000/` con
+-   La URL del servidor se fija al compilar: por defecto
+    `http://127.0.0.1:8000/`; para un servidor compartido,
+    `gradlew assembleDebug -PapiBaseUrl=https://mi-servidor.example.com/`.
+-   `API_BASE_URL` de depuración por defecto: `http://127.0.0.1:8000/` con
     `adb reverse tcp:8000 tcp:8000` (en el emulador o en el celular);
     hay una `network_security_config` solo para depuración que permite
     HTTP a `127.0.0.1`, `localhost` y `10.0.2.2`.
@@ -1282,9 +1319,9 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 59 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 87 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario.
--   App: 71 pruebas unitarias (`app/src/test`): validaciones, formularios
+-   App: 110 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo), contratos JSON con el backend,
     repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
@@ -1308,12 +1345,14 @@ ui/theme/        # colores y tipografía
 
 # 46. Pendientes transversales
 
--   Script de base de datos (`schema.sql`, `seed.sql`, `bd.env.example`) y
-    guía para que el equipo levante el proyecto; evaluar un servidor
-    compartido (MySQL gestionado + backend desplegado) cuando haya que
-    probar la app entre varias personas.
--   Autenticación con token y camino para definir contraseña a usuarios
-    anteriores.
+-   **Servidor compartido** (en curso): el backend ya está preparado para la
+    nube (tokens, `DATABASE_URL`, `JWT_SECRET`, `Dockerfile`, `db/*.sql`).
+    Falta elegir el proveedor, crear la cuenta, desplegar, cargar
+    `db/schema.sql` y `db/seed.sql`, y compilar el APK con
+    `-PapiBaseUrl=https://...` para repartirlo (Firebase App Distribution,
+    app `com.example.frontappia`). Mientras no exista, el APK apunta a
+    `127.0.0.1` y solo funciona con el backend del propio PC.
+-   Camino para definir contraseña a usuarios anteriores (ids 9, 10, 12).
 -   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
     el saldo real y los vencimientos).
 -   Cálculo de endeudamiento y sobreendeudamiento, motor de
