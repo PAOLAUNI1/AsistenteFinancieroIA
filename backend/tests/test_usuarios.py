@@ -182,3 +182,39 @@ def test_login_con_correo_invalido_devuelve_422(client):
         "/usuarios/login", json={"correo": "no-es-correo", "contrasena": CONTRASENA}
     )
     assert respuesta.status_code == 422
+
+
+def test_correo_duplicado_con_la_palabra_aceptar_sigue_siendo_409(client):
+    datos = {
+        "nombre": "Ana",
+        "correo": "aceptar@example.com",
+        "contrasena": "Segura1234",
+        "acepta_terminos": True,
+        "acepta_tratamiento_datos": True,
+    }
+    assert client.post("/usuarios", json=datos).status_code == 201
+    assert client.post("/usuarios", json=datos).status_code == 409
+
+
+def test_registro_simultaneo_con_el_mismo_correo_da_409(client, monkeypatch):
+    from backend.services import perfil
+
+    datos = {
+        "nombre": "Ana",
+        "correo": "carrera@example.com",
+        "contrasena": "Segura1234",
+        "acepta_terminos": True,
+        "acepta_tratamiento_datos": True,
+    }
+    assert client.post("/usuarios", json=datos).status_code == 201
+
+    # Simula que la consulta previa no vio al otro registro: solo la restricción única lo detecta.
+    class _SinResultados:
+        def filter(self, *_):
+            return self
+
+        def first(self):
+            return None
+
+    monkeypatch.setattr(perfil.Session, "query", lambda self, *_: _SinResultados(), raising=False)
+    assert client.post("/usuarios", json=datos).status_code == 409

@@ -18,6 +18,7 @@ registrados cada uno solo vea sus propios datos.
 
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.models import CategoriaGasto, Gasto, Ingreso, MetaAhorro, Usuario
@@ -36,6 +37,14 @@ CATEGORIAS_GASTO_PERFIL = {
 }
 
 
+class TerminosNoAceptados(ValueError):
+    pass
+
+
+class CorreoDuplicado(ValueError):
+    pass
+
+
 def crear_usuario(
     db: Session,
     nombre: str,
@@ -49,12 +58,12 @@ def crear_usuario(
     # de registro validada con el usuario: términos y condiciones +
     # tratamiento de datos son obligatorios antes de crear la cuenta).
     if not acepta_terminos or not acepta_tratamiento_datos:
-        raise ValueError(
+        raise TerminosNoAceptados(
             "Debes aceptar los términos y condiciones y el tratamiento de datos para registrarte."
         )
 
     if db.query(Usuario).filter(Usuario.correo == correo).first() is not None:
-        raise ValueError(f"Ya existe un usuario registrado con el correo {correo}.")
+        raise CorreoDuplicado(f"Ya existe un usuario registrado con el correo {correo}.")
 
     ahora = datetime.utcnow()
     usuario = Usuario(
@@ -66,7 +75,12 @@ def crear_usuario(
         acepto_tratamiento_datos_en=ahora,
     )
     db.add(usuario)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dos registros simultáneos con el mismo correo: el segundo choca con la restricción única.
+        db.rollback()
+        raise CorreoDuplicado(f"Ya existe un usuario registrado con el correo {correo}.")
     db.refresh(usuario)
     return usuario
 

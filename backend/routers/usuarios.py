@@ -5,7 +5,12 @@ from backend.database import get_db
 from backend.deps import usuario_actual
 from backend.models import Usuario
 from backend.schemas.usuario import LoginIn, SesionOut, UsuarioIn, UsuarioOut
-from backend.services.perfil import autenticar_usuario, crear_usuario
+from backend.services.perfil import (
+    CorreoDuplicado,
+    TerminosNoAceptados,
+    autenticar_usuario,
+    crear_usuario,
+)
 from backend.services.tokens import crear_token
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
@@ -28,12 +33,10 @@ def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
             payload.acepta_tratamiento_datos,
             payload.cantidad_hijos,
         )
-    except ValueError as exc:
-        mensaje = str(exc)
-        # "no aceptó" es error de validación del cliente (422); correo
-        # duplicado es conflicto con un recurso existente (409).
-        status = 422 if "aceptar" in mensaje else 409
-        raise HTTPException(status_code=status, detail=mensaje)
+    except TerminosNoAceptados as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except CorreoDuplicado as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return _sesion(usuario)
 
 
