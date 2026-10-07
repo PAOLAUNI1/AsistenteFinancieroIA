@@ -1,4 +1,5 @@
 import os
+import ssl
 from pathlib import Path
 from urllib.parse import quote
 
@@ -36,9 +37,38 @@ def _url_desde_entorno() -> str:
     return url
 
 
+def _contexto_tls() -> ssl.SSLContext | None:
+    """
+    Cifra la conexión con MySQL cuando la base está en otro servidor (p. ej. Aiven). Sin ninguna de
+    estas variables no se usa TLS, como en desarrollo local:
+      DB_SSL_CA_PEM  contenido del certificado de la autoridad (ca.pem) del proveedor
+      DB_SSL_CA      ruta a ese archivo
+      DB_SSL         true para cifrar validando con las autoridades del sistema
+    Con un certificado propio se valida la cadena (VERIFY_CA, como indica Aiven); sin él, también el nombre.
+    """
+    pem = os.getenv("DB_SSL_CA_PEM", "").strip()
+    ruta = os.getenv("DB_SSL_CA", "").strip()
+    if pem:
+        # Al pegar el certificado en una variable de entorno los saltos de línea pueden llegar como "\n" literal.
+        contexto = ssl.create_default_context(cadata=pem.replace("\\n", "\n"))
+    elif ruta:
+        contexto = ssl.create_default_context(cafile=ruta)
+    elif os.getenv("DB_SSL", "").strip().lower() in ("1", "true", "si", "sí"):
+        return ssl.create_default_context()
+    else:
+        return None
+    contexto.check_hostname = False
+    return contexto
+
+
+def _argumentos_de_conexion() -> dict:
+    contexto = _contexto_tls()
+    return {"ssl": contexto} if contexto is not None else {}
+
+
 DATABASE_URL = _url_desde_entorno()
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=_argumentos_de_conexion())
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

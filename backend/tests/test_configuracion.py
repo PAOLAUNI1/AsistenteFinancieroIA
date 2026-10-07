@@ -70,3 +70,77 @@ def test_jwt_dias_con_basura_usa_30(monkeypatch):
 
     monkeypatch.setenv("JWT_DIAS", "abc")
     assert tokens._dias_de_vida() == 30
+
+
+def _certificado_de_prueba() -> str:
+    """Un certificado autofirmado cualquiera, para comprobar que se carga como autoridad."""
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    clave = ec.generate_private_key(ec.SECP256R1())
+    nombre = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "CA de prueba")])
+    ahora = datetime.now(timezone.utc)
+    certificado = (
+        x509.CertificateBuilder()
+        .subject_name(nombre)
+        .issuer_name(nombre)
+        .public_key(clave.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(ahora - timedelta(days=1))
+        .not_valid_after(ahora + timedelta(days=30))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(clave, hashes.SHA256())
+    )
+    return certificado.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def _sin_variables_tls(monkeypatch):
+    for variable in ("DB_SSL_CA_PEM", "DB_SSL_CA", "DB_SSL"):
+        monkeypatch.delenv(variable, raising=False)
+
+
+def test_sin_variables_tls_la_conexion_no_se_cifra(monkeypatch):
+    _sin_variables_tls(monkeypatch)
+
+    assert database._argumentos_de_conexion() == {}
+
+
+def test_con_el_certificado_en_una_variable_se_valida_la_cadena(monkeypatch):
+    import ssl
+
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("DB_SSL_CA_PEM", _certificado_de_prueba())
+
+    contexto = database._argumentos_de_conexion()["ssl"]
+
+    assert contexto.verify_mode == ssl.CERT_REQUIRED
+    assert contexto.check_hostname is False  # VERIFY_CA: Aiven documenta validar solo la cadena
+
+
+def test_el_certificado_con_saltos_de_linea_literales_tambien_se_acepta(monkeypatch):
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("DB_SSL_CA_PEM", _certificado_de_prueba().strip().replace("\n", "\n"))
+
+    assert "ssl" in database._argumentos_de_conexion()
+
+
+def test_con_la_ruta_del_certificado_se_valida_la_cadena(monkeypatch, tmp_path):
+    import ssl
+
+    _sin_variables_tls(monkeypatch)
+    ruta = tmp_path / "ca.pem"
+    ruta.write_text(_certificado_de_prueba())
+    monkeypatch.setenv("DB_SSL_CA", str(ruta))
+
+    assert database._argumentos_de_conexion()["ssl"].verify_mode == ssl.CERT_REQUIRED
+
+
+def test_db_ssl_true_cifra_validando_tambien_el_nombre(monkeypatch):
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("DB_SSL", "true")
+
+    assert database._argumentos_de_conexion()["ssl"].check_hostname is True

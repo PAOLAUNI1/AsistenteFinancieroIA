@@ -1,0 +1,20 @@
+# Plano de despliegue para Render (Blueprint). Construye el Dockerfile de la raíz.
+# La base MySQL NO la ofrece Render: se usa una externa (p. ej. Aiven) y su URL se
+# pega como DATABASE_URL en el panel de Render (sync: false = se pide al crear el servicio).
+services:
+  - type: web
+    name: finzen-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL        # mysql://usuario:clave@host:puerto/base
+        sync: false
+      - key: DB_SSL_CA_PEM       # contenido del ca.pem del proveedor de MySQL
+        sync: false
+      - key: JWT_SECRET          # Render genera un valor aleatorio largo
+        generateValue: true
+      # Detrás del proxy de Render la IP real llega en X-Forwarded-For; sin esto el límite de
+      # intentos de login vería la IP del proxy y 20 fallos de cualquiera bloquearían a todos.
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"

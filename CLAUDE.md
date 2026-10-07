@@ -1100,7 +1100,7 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis (solo traducen HTTP)
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, analisis, catalogo)
 ├── services/          # reglas: deudas, repositorio_deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (241 pruebas)
+├── tests/             # pytest (246 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
@@ -1219,7 +1219,8 @@ Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
 (`mysql://usuario:clave@host:puerto/base`) en un servidor en la nube;
 `JWT_SECRET` (obligatoria con `APP_ENV=production`, de 32 caracteres o más; el
 Dockerfile ya fija `APP_ENV`); opcionales `JWT_DIAS` y
-`BCRYPT_ROUNDS`. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
+`BCRYPT_ROUNDS`. Si la base exige TLS: `DB_SSL_CA_PEM` (contenido del `ca.pem`
+del proveedor), `DB_SSL_CA` (ruta) o `DB_SSL=true` (`backend/database.py`). El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
 con un usuario sin privilegios y un `HEALTHCHECK` sobre `/health` (no se pudo
 probar localmente: no hay Docker instalado).
 
@@ -1341,7 +1342,7 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 241 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 246 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
@@ -1372,13 +1373,19 @@ ui/theme/        # colores y tipografía
 
 # 46. Pendientes transversales
 
--   **Servidor compartido** (en curso): el backend ya está preparado para la
-    nube (tokens, `DATABASE_URL`, `JWT_SECRET`, `Dockerfile`, `db/*.sql`).
-    Falta elegir el proveedor, crear la cuenta, desplegar, cargar
-    `db/schema.sql` y `db/seed.sql`, y compilar el APK con
-    `-PapiBaseUrl=https://...` para repartirlo (Firebase App Distribution,
-    app `com.example.frontappia`). Mientras no exista, el APK apunta a
-    `127.0.0.1` y solo funciona con el backend del propio PC.
+-   **Servidor compartido** (en curso, decisión: **Render** para la API y una
+    MySQL externa, p. ej. Aiven, porque Render no ofrece MySQL). Preparado en
+    el repositorio: tokens, `DATABASE_URL`, TLS opcional hacia la base,
+    `JWT_SECRET`, `Dockerfile`, `render.yaml` (Blueprint con
+    `FORWARDED_ALLOW_IPS=*` para que el límite de login use la IP real) y
+    `db/*.sql`. Falta lo que debe hacer una persona con su cuenta: crear la
+    MySQL, cargar `db/schema.sql` y `db/seed.sql`, crear el servicio en Render
+    con `DATABASE_URL` y `DB_SSL_CA_PEM`, y compilar el APK con
+    `-PapiBaseUrl=https://<servicio>.onrender.com/` para repartirlo (Firebase
+    App Distribution, app `com.example.frontappia`). El plan gratuito de Render
+    se duerme tras ~15 minutos sin uso y la primera petición tarda ~1 minuto.
+    Mientras no exista, el APK apunta a `127.0.0.1` y solo funciona con el
+    backend del propio PC.
 -   Camino para definir contraseña a usuarios anteriores (ids 9, 10, 12).
 -   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
     el saldo real y los vencimientos).
