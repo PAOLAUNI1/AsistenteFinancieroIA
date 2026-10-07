@@ -1093,13 +1093,13 @@ reglas de negocio.
 
 ``` text
 backend/
-├── main.py            # FastAPI + routers
+├── main.py            # FastAPI + routers + formato del 422 (sin eco del valor recibido)
 ├── database.py        # engine MySQL (credenciales en bd.env)
 ├── deps.py            # usuario_actual (lee el token Bearer)
 ├── models.py          # modelos SQLAlchemy
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, catalogo)
-├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad, tokens
+├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
 ├── tests/             # pytest (111 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
@@ -1155,15 +1155,17 @@ MySQL, base `asistente_financiero`, 14 tablas: `usuarios`, `deudas`,
 `/meta-ahorro`, `/analisis`, `/usuarios/me`) exigen
 `Authorization: Bearer <token>` y solo devuelven datos del dueño del token.
 El token es un JWT (HS256) firmado con la variable de entorno `JWT_SECRET`
-(si falta, se genera una clave temporal al arrancar y las sesiones se pierden
-al reiniciar) y dura `JWT_DIAS` días (30 por defecto). Sin token, con token
+(con `APP_ENV=production` es obligatoria y de 32 caracteres o más, si no el
+servidor no arranca; fuera de producción, si falta, se genera una clave
+temporal y las sesiones se pierden al reiniciar) y dura `JWT_DIAS` días (30 por defecto). Sin token, con token
 alterado, vencido o sin vencimiento: 401; cuenta inactiva: 403. Ya no existe
 el parámetro `usuario_id` ni el listado público de usuarios. Los tests usan
 un cliente que convierte `params={"usuario_id": ...}` en el token de ese
 usuario (`backend/tests/conftest.py`) y `test_autenticacion.py` cubre los
-casos de seguridad. El inicio de sesión se bloquea con 429 (y `Retry-After`) tras 5 contraseñas
-incorrectas por correo o 20 por IP en 15 minutos (`services/limite_intentos.py`,
-en memoria: con varios procesos cada uno llevaría su cuenta).
+casos de seguridad. El inicio de sesión se bloquea con 429 (y `Retry-After`)
+tras 5 contraseñas incorrectas por correo o 20 por IP en 15 minutos
+(`services/limite_intentos.py`, en memoria: con varios procesos cada uno
+llevaría su cuenta). Cada 401 se crea por petición (`deps._no_autorizado`).
 
 ## Reglas relevantes
 
@@ -1186,7 +1188,22 @@ en memoria: con varios procesos cada uno llevaría su cuenta).
     día del mes). Sin pago mínimo, `valor_cuota` queda nulo.
     Validaciones: saldo > 0, saldo <= cupo.
 -   `saldo_actual` de las deudas con cuotas no puede superar el monto
-    inicial.
+    inicial (también en consumo y préstamo personal).
+-   **Límites de entrada** (`schemas/`, alineados con las columnas de MySQL
+    para que un dato fuera de rango dé 422 y no un 500): montos hasta
+    `MAX_MONTO` (9.999.999.999.999), tasa hasta 100 y redondeada a 4
+    decimales, años hasta 40, hijos hasta 30, `Infinity`/`NaN` rechazados y
+    `max_length` en los textos (entidad 100, prestamista 60, artículo 30,
+    etc.). Si MySQL aún rechaza el dato (`DataError`/`IntegrityError`), se
+    hace rollback y se responde 422. El cuerpo del 422 solo trae `loc`, `msg`
+    y `type`: nunca el valor recibido (podría ser una contraseña).
+-   **Registro:** el router distingue `TerminosNoAceptados` (422) y
+    `CorreoDuplicado` (409); un registro simultáneo con el mismo correo
+    también da 409.
+-   **Esquema de la base:** se crea solo con `db/schema.sql` + `db/seed.sql`.
+    La aplicación ya no ejecuta `create_all` al arrancar (no crea los CHECK
+    ni los catálogos y sus tipos de clave no coinciden); solo lo usan las
+    pruebas, sobre SQLite.
 
 ## Cómo ejecutar y probar
 
@@ -1362,3 +1379,24 @@ ui/theme/        # colores y tipografía
     recomendaciones, IA personalizada, alertas y vencimientos (pasos 12 a
     16 de la sección 32).
 -   Poner la app Android bajo control de versiones.
+-   **Pendientes de la revisión de código de octubre 2026** (rama `DEV`, ya
+    resueltos: validaciones de entrada, `JWT_SECRET`, `create_all`, 401,
+    errores de registro y límite de login):
+    -   Fecha de pago de la tarjeta: `proxima_fecha_de_pago` usa
+        `date.today()` (hora del servidor, UTC en la nube); calcular con la
+        zona `America/Bogota`.
+    -   Conexión a MySQL: sin TLS y con `root` sin contraseña por defecto si
+        faltan las variables.
+    -   Dockerfile: usuario no root, versiones fijas de dependencias
+        (separar las de pruebas) y `HEALTHCHECK`.
+    -   Dinero como `float` en schemas y servicios: pasar a `Decimal` antes
+        del registro de pagos.
+    -   Calidad: los ocho endpoints `POST /deudas/*` y los ocho validadores
+        repiten estructura (registro único de tipos, constructor común de la
+        base, validación común de cuotas), el router hace persistencia
+        (`_registrar`, borrado en cascada, N+1 en el listado), análisis sin
+        `response_model`, tests con casos repetidos por tipo y sin pruebas
+        de endpoint para libre inversión, préstamo personal y consumo.
+    -   `validar_educativo` conserva un contrato anterior (inventa 24 meses
+        si no llega plazo) que la app ya no usa.
+    -   La app Android debe mostrar un mensaje propio ante el 429 del login.
