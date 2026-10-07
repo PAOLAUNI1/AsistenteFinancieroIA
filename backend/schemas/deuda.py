@@ -28,17 +28,23 @@ class HipotecarioIn(BaseModel):
 
 class TarjetaIn(BaseModel):
     entidad: str
-    franquicia: str = "Visa"
+    franquicia: str | None = None
     ultimos_digitos: str | None = Field(default=None, max_length=4)
     cupo_total: float = Field(gt=0)
     saldo_actual: float = Field(gt=0)
     tasa: float = Field(ge=0)
     periodicidad_tasa: PeriodicidadTasa = "MENSUAL"
-    pago_minimo: float = Field(gt=0)
-    cuota_manejo: float = 0.0
+    # Opcionales: la app móvil no los pide al registrar; si no llegan, el pago mínimo
+    # queda sin definir (0) y la fecha del próximo pago se calcula con el día de pago.
+    pago_minimo: float = Field(ge=0, default=0.0)
+    cuota_manejo: float = Field(ge=0, default=0.0)
     dia_corte: int = Field(ge=1, le=31, default=15)
     dia_pago: int = Field(ge=1, le=31, default=5)
-    proximo_pago: date
+    proximo_pago: date | None = None
+    nombre: str | None = Field(default=None, max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    # False deja la tarjeta en estado CANCELADA: no cuenta en el análisis.
+    activa: bool = True
 
 
 class VehiculoIn(BaseModel):

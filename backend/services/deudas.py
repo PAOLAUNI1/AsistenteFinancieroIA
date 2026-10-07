@@ -15,6 +15,7 @@ el formulario en Streamlit, para no reinventar las reglas ya definidas en
 la sección 10 de CLAUDE.md.
 """
 
+import calendar
 from datetime import date
 
 
@@ -78,19 +79,37 @@ def validar_hipotecario(
     }
 
 
+def proxima_fecha_de_pago(dia_pago: int, hoy: date | None = None) -> date:
+    """Próxima fecha (hoy incluido) en que cae el día de pago, ajustado al fin de mes."""
+    hoy = hoy or date.today()
+    anio, mes = hoy.year, hoy.month
+    for _ in range(2):
+        ultimo_dia = calendar.monthrange(anio, mes)[1]
+        candidata = date(anio, mes, min(dia_pago, ultimo_dia))
+        if candidata >= hoy:
+            return candidata
+        mes += 1
+        if mes > 12:
+            mes, anio = 1, anio + 1
+    return candidata
+
+
 def validar_tarjeta(
     entidad: str,
-    franquicia: str,
-    ultimos_digitos: str | None,
     cupo_total: float,
     saldo_actual: float,
     tasa: float,
-    periodicidad_tasa: str,
-    pago_minimo: float,
-    cuota_manejo: float,
-    dia_corte: int,
-    dia_pago: int,
-    proximo_pago: date,
+    periodicidad_tasa: str = "MENSUAL",
+    dia_corte: int = 15,
+    dia_pago: int = 5,
+    franquicia: str | None = None,
+    ultimos_digitos: str | None = None,
+    pago_minimo: float = 0.0,
+    cuota_manejo: float = 0.0,
+    proximo_pago: date | None = None,
+    nombre: str | None = None,
+    descripcion: str | None = None,
+    activa: bool = True,
 ) -> dict:
     if not entidad.strip():
         raise ValueError("Ingresa la entidad financiera emisora.")
@@ -100,14 +119,17 @@ def validar_tarjeta(
         raise ValueError("El saldo adeudado debe ser mayor a cero.")
     if saldo_actual > cupo_total:
         raise ValueError("El saldo utilizado no puede superar el cupo aprobado.")
-    if pago_minimo <= 0:
-        raise ValueError("El pago mínimo mensual debe ser mayor a cero.")
+    if pago_minimo < 0 or cuota_manejo < 0:
+        raise ValueError("El pago mínimo y la cuota de manejo no pueden ser negativos.")
 
     cuota_total_mes = pago_minimo + cuota_manejo
 
     return {
         "base": {
             "entidad": entidad.strip(),
+            "nombre": nombre.strip() if nombre and nombre.strip() else None,
+            "descripcion": descripcion.strip() if descripcion and descripcion.strip() else None,
+            "estado": "ACTIVA" if activa else "CANCELADA",
             "monto_inicial": cupo_total,
             "saldo_actual": saldo_actual,
             "tiene_intereses": tasa > 0,
@@ -115,9 +137,9 @@ def validar_tarjeta(
             "periodicidad_tasa": periodicidad_tasa,
             "tipo_tasa": "VARIABLE",
             "plazo_meses": None,
-            "valor_cuota": cuota_total_mes,
+            "valor_cuota": cuota_total_mes if cuota_total_mes > 0 else None,
             "proxima_cuota": None,
-            "fecha_proximo_pago": proximo_pago,
+            "fecha_proximo_pago": proximo_pago or proxima_fecha_de_pago(dia_pago),
         },
         "detalle": {
             "cupo_total": cupo_total,

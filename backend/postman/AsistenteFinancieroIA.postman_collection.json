@@ -178,7 +178,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"franquicia\": \"Visa\",\n  \"ultimos_digitos\": \"4521\",\n  \"cupo_total\": 800000,\n  \"saldo_actual\": 600000,\n  \"tasa\": 2.5,\n  \"periodicidad_tasa\": \"MENSUAL\",\n  \"pago_minimo\": 50000,\n  \"cuota_manejo\": 10000,\n  \"dia_corte\": 15,\n  \"dia_pago\": 5,\n  \"proximo_pago\": \"2026-10-05\"\n}"
+              "raw": "{\n  \"entidad\": \"Bancolombia\",\n  \"franquicia\": \"Visa\",\n  \"ultimos_digitos\": \"4521\",\n  \"cupo_total\": 800000,\n  \"saldo_actual\": 600000,\n  \"tasa\": 2.5,\n  \"periodicidad_tasa\": \"MENSUAL\",\n  \"pago_minimo\": 50000,\n  \"cuota_manejo\": 10000,\n  \"dia_corte\": 15,\n  \"dia_pago\": 5,\n  \"proximo_pago\": \"2026-10-05\",\n  \"nombre\": \"Visa Bancolombia\",\n  \"activa\": true\n}"
             }
           }
         },

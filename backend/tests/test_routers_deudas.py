@@ -108,6 +108,111 @@ def test_tarjeta_guarda_detalle_y_no_tiene_plazo_fijo(client, usuario_id):
     assert cuerpo["detalle"]["dia_pago"] == 5
 
 
+def _tarjeta(**extra):
+    return {
+        "entidad": "Bancolombia",
+        "franquicia": "Visa",
+        "ultimos_digitos": "1234",
+        "cupo_total": 800000,
+        "saldo_actual": 600000,
+        "tasa": 2.5,
+        "pago_minimo": 50000,
+        "cuota_manejo": 10000,
+        "dia_corte": 15,
+        "dia_pago": 5,
+        "proximo_pago": "2026-10-05",
+        **extra,
+    }
+
+
+def test_tarjeta_guarda_nombre_y_detalle_completo(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta",
+        params={"usuario_id": usuario_id},
+        json=_tarjeta(nombre="  Visa personal  "),
+    )
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre"] == "Visa personal"
+    assert cuerpo["estado"] == "ACTIVA"
+    assert cuerpo["saldo_actual"] == 600000
+    assert cuerpo["valor_cuota"] == 60000  # pago mínimo + cuota de manejo
+    assert cuerpo["detalle"]["cupo_total"] == 800000
+    assert cuerpo["detalle"]["franquicia"] == "Visa"
+    assert cuerpo["detalle"]["ultimos_digitos"] == "1234"
+
+
+def test_tarjeta_sin_nombre_sigue_funcionando(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta", params={"usuario_id": usuario_id}, json=_tarjeta()
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["nombre"] is None
+
+
+def test_tarjeta_inactiva_queda_cancelada_y_no_cuenta_en_el_analisis(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta", params={"usuario_id": usuario_id}, json=_tarjeta(activa=False)
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["estado"] == "CANCELADA"
+
+
+def test_tarjeta_con_saldo_mayor_al_cupo_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta",
+        params={"usuario_id": usuario_id},
+        json=_tarjeta(saldo_actual=900000),
+    )
+    assert respuesta.status_code == 422
+
+
+def test_tarjeta_sin_intereses_es_valida(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta", params={"usuario_id": usuario_id}, json=_tarjeta(tasa=0)
+    )
+    assert respuesta.status_code == 201
+    assert respuesta.json()["tiene_intereses"] is False
+
+
+def test_tarjeta_con_los_datos_minimos_de_la_app(client, usuario_id):
+    # Lo único que pide la app móvil: sin franquicia, pago mínimo ni fecha de próximo pago.
+    payload = {
+        "entidad": "Davivienda",
+        "nombre": "Tarjeta de crédito Davivienda",
+        "cupo_total": 5_000_000,
+        "saldo_actual": 2_500_000,
+        "tasa": 2.2,
+        "periodicidad_tasa": "MENSUAL",
+        "dia_corte": 25,
+        "dia_pago": 10,
+        "descripcion": "Tarjeta principal para gastos del hogar y compras varias.",
+        "activa": True,
+    }
+    respuesta = client.post(
+        "/deudas/tarjeta", params={"usuario_id": usuario_id}, json=payload
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["nombre"] == "Tarjeta de crédito Davivienda"
+    assert cuerpo["descripcion"].startswith("Tarjeta principal")
+    assert cuerpo["valor_cuota"] is None  # sin pago mínimo no hay cuota que mostrar
+    assert cuerpo["detalle"]["franquicia"] is None
+    assert cuerpo["detalle"]["dia_corte"] == 25
+    assert cuerpo["fecha_proximo_pago"] is not None
+    assert cuerpo["fecha_proximo_pago"].endswith("-10")  # cae el día de pago
+
+
+def test_tarjeta_descripcion_demasiado_larga_se_rechaza(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/tarjeta",
+        params={"usuario_id": usuario_id},
+        json=_tarjeta(descripcion="x" * 201),
+    )
+    assert respuesta.status_code == 422
+
+
 def test_eliminar_deuda(client, usuario_id):
     payload = {
         "prestamista": "Juan Pérez",

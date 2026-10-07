@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from backend.services.deudas import (
+    proxima_fecha_de_pago,
     validar_consumo,
     validar_hipotecario,
     validar_libre_inversion,
@@ -178,3 +179,18 @@ def test_libre_inversion_calcula_plazo():
 
     assert resultado["base"]["plazo_meses"] == 36
     assert resultado["base"]["proxima_cuota"] == 10
+
+
+def test_proxima_fecha_de_pago_es_este_mes_si_el_dia_no_ha_pasado():
+    assert proxima_fecha_de_pago(10, hoy=date(2026, 10, 5)) == date(2026, 10, 10)
+    assert proxima_fecha_de_pago(5, hoy=date(2026, 10, 5)) == date(2026, 10, 5)
+
+
+def test_proxima_fecha_de_pago_pasa_al_mes_siguiente_si_el_dia_ya_paso():
+    assert proxima_fecha_de_pago(10, hoy=date(2026, 10, 20)) == date(2026, 11, 10)
+    assert proxima_fecha_de_pago(3, hoy=date(2026, 12, 20)) == date(2027, 1, 3)
+
+
+def test_proxima_fecha_de_pago_se_ajusta_al_ultimo_dia_del_mes():
+    assert proxima_fecha_de_pago(31, hoy=date(2026, 2, 10)) == date(2026, 2, 28)
+    assert proxima_fecha_de_pago(31, hoy=date(2026, 4, 10)) == date(2026, 4, 30)
