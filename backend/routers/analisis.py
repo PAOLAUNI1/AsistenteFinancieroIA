@@ -1,27 +1,17 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.deps import usuario_actual
 from backend.models import Deuda, Usuario
+from backend.schemas.analisis import AnalisisIn, AnalisisOut
 from backend.services.analisis import calcular_analisis
 from backend.services.perfil import obtener_meta_principal, obtener_perfil
 
 router = APIRouter(tags=["analisis"])
 
 
-class AnalisisIn(BaseModel):
-    """
-    Único dato que no vive en el perfil persistido: "Compras no esenciales"
-    (app.py, sección inferior del prototipo) se ingresa al momento de pedir
-    el análisis, igual que hoy en Streamlit.
-    """
-
-    compras_no_esenciales: float = Field(ge=0, default=0.0)
-
-
-@router.post("/analisis")
+@router.post("/analisis", response_model=AnalisisOut)
 def obtener_analisis(
     payload: AnalisisIn,
     usuario: Usuario = Depends(usuario_actual),

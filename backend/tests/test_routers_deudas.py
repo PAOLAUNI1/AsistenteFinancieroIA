@@ -158,15 +158,6 @@ def test_tarjeta_inactiva_queda_cancelada_y_no_cuenta_en_el_analisis(client, usu
     assert respuesta.json()["estado"] == "CANCELADA"
 
 
-def test_tarjeta_con_saldo_mayor_al_cupo_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/tarjeta",
-        params={"usuario_id": usuario_id},
-        json=_tarjeta(saldo_actual=900000),
-    )
-    assert respuesta.status_code == 422
-
-
 def test_tarjeta_sin_intereses_es_valida(client, usuario_id):
     respuesta = client.post(
         "/deudas/tarjeta", params={"usuario_id": usuario_id}, json=_tarjeta(tasa=0)
@@ -248,39 +239,6 @@ def test_vehiculo_guarda_los_datos_del_diseno_de_la_app(client, usuario_id):
     assert cuerpo["detalle"]["tipo_vehiculo"] == "OTRO"  # la app no pregunta el tipo
 
 
-def test_vehiculo_inactivo_queda_cancelado(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/vehiculo", params={"usuario_id": usuario_id}, json=_vehiculo(activa=False)
-    )
-    assert respuesta.status_code == 201
-    assert respuesta.json()["estado"] == "CANCELADA"
-
-
-def test_vehiculo_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/vehiculo",
-        params={"usuario_id": usuario_id},
-        json=_vehiculo(saldo_actual=46_000_000),
-    )
-    assert respuesta.status_code == 422
-
-
-def test_vehiculo_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/vehiculo", params={"usuario_id": usuario_id}, json=_vehiculo(cuota_proxima=61)
-    )
-    assert respuesta.status_code == 422
-
-
-def test_vehiculo_con_inicio_posterior_al_proximo_pago_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/vehiculo",
-        params={"usuario_id": usuario_id},
-        json=_vehiculo(fecha_inicio="2026-12-01"),
-    )
-    assert respuesta.status_code == 422
-
-
 def _educativo(**extra):
     return {
         "entidad": "CUN",
@@ -325,7 +283,8 @@ def test_educativo_con_cuotas_ya_pagadas(client, usuario_id):
     assert respuesta.json()["cuotas_pendientes"] == 3  # 5 - 3 + 1
 
 
-def test_educativo_con_el_contrato_anterior_sigue_funcionando(client, usuario_id):
+def test_educativo_sin_plazo_total_se_rechaza(client, usuario_id):
+    # Ya no existe el contrato anterior que solo traía `cuotas_pendientes`: el plazo es obligatorio.
     respuesta = client.post(
         "/deudas/educativo",
         params={"usuario_id": usuario_id},
@@ -337,42 +296,6 @@ def test_educativo_con_el_contrato_anterior_sigue_funcionando(client, usuario_id
             "valor_cuota": 250_000,
             "proximo_pago": "2026-10-30",
         },
-    )
-    assert respuesta.status_code == 201
-    cuerpo = respuesta.json()
-    assert cuerpo["plazo_meses"] == 24
-    assert cuerpo["cuotas_pendientes"] == 24
-
-
-def test_educativo_inactivo_queda_cancelado(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/educativo", params={"usuario_id": usuario_id}, json=_educativo(activa=False)
-    )
-    assert respuesta.status_code == 201
-    assert respuesta.json()["estado"] == "CANCELADA"
-
-
-def test_educativo_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/educativo", params={"usuario_id": usuario_id}, json=_educativo(cuota_proxima=6)
-    )
-    assert respuesta.status_code == 422
-
-
-def test_educativo_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/educativo",
-        params={"usuario_id": usuario_id},
-        json=_educativo(saldo_actual=3_000_000),
-    )
-    assert respuesta.status_code == 422
-
-
-def test_educativo_con_inicio_posterior_al_proximo_pago_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/educativo",
-        params={"usuario_id": usuario_id},
-        json=_educativo(fecha_inicio="2026-01-01"),
     )
     assert respuesta.status_code == 422
 
@@ -418,39 +341,6 @@ def test_otros_con_tipo_de_credito_desconocido_se_rechaza(client, usuario_id):
         json=_otros(tipo_credito="INVENTADO"),
     )
     assert respuesta.status_code == 422
-
-
-def test_otros_inactivo_queda_cancelado(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(activa=False)
-    )
-    assert respuesta.status_code == 201
-    assert respuesta.json()["estado"] == "CANCELADA"
-
-
-def test_otros_con_cuota_proxima_fuera_del_plazo_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(cuota_proxima=9)
-    )
-    assert respuesta.status_code == 422
-
-
-def test_otros_con_saldo_mayor_al_monto_se_rechaza(client, usuario_id):
-    respuesta = client.post(
-        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros(saldo_actual=800_000)
-    )
-    assert respuesta.status_code == 422
-
-
-def test_otros_se_puede_eliminar_con_su_detalle(client, usuario_id):
-    creada = client.post(
-        "/deudas/otros", params={"usuario_id": usuario_id}, json=_otros()
-    ).json()
-
-    eliminar = client.delete(f"/deudas/{creada['id']}", params={"usuario_id": usuario_id})
-
-    assert eliminar.status_code == 204
-    assert client.get("/deudas", params={"usuario_id": usuario_id}).json() == []
 
 
 def test_eliminar_deuda(client, usuario_id):

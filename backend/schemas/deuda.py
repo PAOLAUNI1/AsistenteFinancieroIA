@@ -96,10 +96,7 @@ class EducativoIn(BaseModel):
     entidad: str = Field(max_length=100)
     carrera: str | None = Field(default=None, max_length=120)  # programa o concepto
     modalidad: str = Field(default="En amortización", max_length=80)
-    # Contrato anterior: solo cuotas por pagar (el plazo total era igual a ese valor).
-    cuotas_pendientes: int | None = Field(ge=1, le=360, default=None)
-    # Contrato de la app: plazo total en meses y la próxima cuota a pagar.
-    plazo_meses: int | None = Field(ge=1, le=360, default=None)
+    plazo_meses: int = Field(ge=1, le=360)  # plazo total
     cuota_proxima: int = Field(ge=1, default=1)
     monto_inicial: MontoNoNegativo = 0
     saldo_actual: MontoPositivo
@@ -193,3 +190,33 @@ class DeudaOut(BaseModel):
     fecha_inicio: date | None = None
     descripcion: str | None = None
     detalle: dict
+
+    @classmethod
+    def desde_modelo(cls, deuda, detalle: dict) -> "DeudaOut":
+        """Arma la respuesta desde una fila de `deudas` (con su tipo) y los datos de su tabla de detalle."""
+        cuotas_pendientes = None
+        if deuda.plazo_meses is not None and deuda.proxima_cuota is not None:
+            cuotas_pendientes = max(deuda.plazo_meses - deuda.proxima_cuota + 1, 0)
+        return cls(
+            id=deuda.id,
+            tipo_codigo=deuda.tipo_deuda.codigo,
+            tipo_nombre=deuda.tipo_deuda.nombre,
+            icono=deuda.tipo_deuda.icono,
+            entidad=deuda.entidad,
+            monto_inicial=deuda.monto_inicial,
+            saldo_actual=deuda.saldo_actual,
+            tiene_intereses=deuda.tiene_intereses,
+            tasa_interes=deuda.tasa_interes,
+            periodicidad_tasa=deuda.periodicidad_tasa,
+            tipo_tasa=deuda.tipo_tasa,
+            plazo_meses=deuda.plazo_meses,
+            valor_cuota=deuda.valor_cuota,
+            proxima_cuota=deuda.proxima_cuota,
+            cuotas_pendientes=cuotas_pendientes,
+            fecha_proximo_pago=deuda.fecha_proximo_pago,
+            estado=deuda.estado,
+            nombre=deuda.nombre,
+            fecha_inicio=deuda.fecha_inicio,
+            descripcion=deuda.descripcion,
+            detalle=detalle,
+        )

@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.models import CategoriaGasto, Gasto, Ingreso, MetaAhorro, Usuario
+from backend.tiempo import ahora_utc
 from backend.services.seguridad import hashear_contrasena, verificar_contrasena
 
 # Categorías de gasto sembradas en la base (sección 4 de CLAUDE.md).
@@ -65,7 +66,7 @@ def crear_usuario(
     if db.query(Usuario).filter(Usuario.correo == correo).first() is not None:
         raise CorreoDuplicado(f"Ya existe un usuario registrado con el correo {correo}.")
 
-    ahora = datetime.utcnow()
+    ahora = ahora_utc()
     usuario = Usuario(
         nombre=nombre.strip(),
         correo=correo.strip(),

@@ -18,6 +18,70 @@ la sección 10 de CLAUDE.md.
 import calendar
 from datetime import date
 
+from backend.tiempo import hoy_colombia
+
+
+def _texto(valor: str | None) -> str | None:
+    """El texto sin espacios sobrantes, o None si queda vacío."""
+    return (valor or "").strip() or None
+
+
+def _exigir(es_invalido: bool, mensaje: str) -> None:
+    if es_invalido:
+        raise ValueError(mensaje)
+
+
+def _base_deuda(
+    *,
+    entidad: str,
+    monto_inicial: float,
+    saldo_actual: float,
+    tasa: float | None,
+    periodicidad_tasa: str | None,
+    tipo_tasa: str | None,
+    plazo_meses: int | None,
+    valor_cuota: float | None,
+    proxima_cuota: int | None,
+    proximo_pago: date,
+    tiene_intereses: bool,
+    nombre: str | None = None,
+    fecha_inicio: date | None = None,
+    descripcion: str | None = None,
+    activa: bool = True,
+) -> dict:
+    """Columnas de la tabla `deudas` que comparten los ocho tipos de deuda."""
+    return {
+        "entidad": entidad,
+        "nombre": _texto(nombre),
+        "monto_inicial": monto_inicial,
+        "saldo_actual": saldo_actual,
+        "tiene_intereses": tiene_intereses,
+        "tasa_interes": tasa,
+        "periodicidad_tasa": periodicidad_tasa,
+        "tipo_tasa": tipo_tasa,
+        "plazo_meses": plazo_meses,
+        "valor_cuota": valor_cuota,
+        "proxima_cuota": proxima_cuota,
+        "fecha_proximo_pago": proximo_pago,
+        "fecha_inicio": fecha_inicio,
+        "descripcion": _texto(descripcion),
+        "estado": "ACTIVA" if activa else "CANCELADA",
+    }
+
+
+def _base_credito(*, tasa: float, **resto) -> dict:
+    """Base de un crédito con cuotas fijas: hay intereses si la tasa es mayor a cero y la tasa es fija."""
+    resto.setdefault("tiene_intereses", tasa > 0)
+    resto.setdefault("tipo_tasa", "FIJA")
+    return _base_deuda(tasa=tasa, **resto)
+
+
+def _exigir_inicio_no_posterior(fecha_inicio: date | None, proximo_pago: date) -> None:
+    _exigir(
+        fecha_inicio is not None and fecha_inicio > proximo_pago,
+        "La fecha de inicio no puede ser posterior al próximo pago.",
+    )
+
 
 def validar_hipotecario(
     entidad: str,
@@ -38,50 +102,41 @@ def validar_hipotecario(
 ) -> dict:
     plazo_meses = (anos * 12) + meses
 
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad financiera.")
-    if monto_inicial <= 0:
-        raise ValueError("El monto inicial debe ser mayor que cero.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo actual debe ser mayor que cero.")
-    if saldo_actual > monto_inicial:
-        raise ValueError("El saldo actual no puede ser mayor al monto inicial.")
-    if tasa <= 0:
-        raise ValueError("Ingresa una tasa de interés válida.")
-    if plazo_meses <= 0:
-        raise ValueError("El plazo del crédito debe ser mayor a 0 meses.")
-    if cuota_proxima > plazo_meses:
-        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota mensual debe ser mayor que cero.")
-    if fecha_inicio is not None and fecha_inicio > proximo_pago:
-        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+    _exigir(not entidad.strip(), "Ingresa la entidad financiera.")
+    _exigir(monto_inicial <= 0, "El monto inicial debe ser mayor que cero.")
+    _exigir(saldo_actual <= 0, "El saldo actual debe ser mayor que cero.")
+    _exigir(saldo_actual > monto_inicial, "El saldo actual no puede ser mayor al monto inicial.")
+    _exigir(tasa <= 0, "Ingresa una tasa de interés válida.")
+    _exigir(plazo_meses <= 0, "El plazo del crédito debe ser mayor a 0 meses.")
+    _exigir(cuota_proxima > plazo_meses, "La próxima cuota no puede superar el total de cuotas.")
+    _exigir(valor_cuota <= 0, "El valor de la cuota mensual debe ser mayor que cero.")
+    _exigir_inicio_no_posterior(fecha_inicio, proximo_pago)
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "nombre": (nombre or "").strip() or None,
-            "monto_inicial": monto_inicial,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": True,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": tipo_tasa,
-            "plazo_meses": plazo_meses,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": cuota_proxima,
-            "fecha_proximo_pago": proximo_pago,
-            "fecha_inicio": fecha_inicio,
-            "descripcion": (descripcion or "").strip() or None,
-            "estado": "ACTIVA" if activa else "CANCELADA",
-        },
+        "base": _base_credito(
+            entidad=entidad.strip(),
+            nombre=nombre,
+            monto_inicial=monto_inicial,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            tipo_tasa=tipo_tasa,
+            plazo_meses=plazo_meses,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+            fecha_inicio=fecha_inicio,
+            descripcion=descripcion,
+            activa=activa,
+            tiene_intereses=True,
+        ),
         "detalle": None,
     }
 
 
 def proxima_fecha_de_pago(dia_pago: int, hoy: date | None = None) -> date:
     """Próxima fecha (hoy incluido) en que cae el día de pago, ajustado al fin de mes."""
-    hoy = hoy or date.today()
+    hoy = hoy or hoy_colombia()
     anio, mes = hoy.year, hoy.month
     for _ in range(2):
         ultimo_dia = calendar.monthrange(anio, mes)[1]
@@ -111,36 +166,34 @@ def validar_tarjeta(
     descripcion: str | None = None,
     activa: bool = True,
 ) -> dict:
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad financiera emisora.")
-    if cupo_total <= 0:
-        raise ValueError("El cupo total aprobado debe ser mayor a cero.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo adeudado debe ser mayor a cero.")
-    if saldo_actual > cupo_total:
-        raise ValueError("El saldo utilizado no puede superar el cupo aprobado.")
-    if pago_minimo < 0 or cuota_manejo < 0:
-        raise ValueError("El pago mínimo y la cuota de manejo no pueden ser negativos.")
+    _exigir(not entidad.strip(), "Ingresa la entidad financiera emisora.")
+    _exigir(cupo_total <= 0, "El cupo total aprobado debe ser mayor a cero.")
+    _exigir(saldo_actual <= 0, "El saldo adeudado debe ser mayor a cero.")
+    _exigir(saldo_actual > cupo_total, "El saldo utilizado no puede superar el cupo aprobado.")
+    _exigir(
+        pago_minimo < 0 or cuota_manejo < 0,
+        "El pago mínimo y la cuota de manejo no pueden ser negativos.",
+    )
 
     cuota_total_mes = pago_minimo + cuota_manejo
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "nombre": nombre.strip() if nombre and nombre.strip() else None,
-            "descripcion": descripcion.strip() if descripcion and descripcion.strip() else None,
-            "estado": "ACTIVA" if activa else "CANCELADA",
-            "monto_inicial": cupo_total,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "VARIABLE",
-            "plazo_meses": None,
-            "valor_cuota": cuota_total_mes if cuota_total_mes > 0 else None,
-            "proxima_cuota": None,
-            "fecha_proximo_pago": proximo_pago or proxima_fecha_de_pago(dia_pago),
-        },
+        "base": _base_deuda(
+            entidad=entidad.strip(),
+            nombre=nombre,
+            monto_inicial=cupo_total,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            tipo_tasa="VARIABLE",
+            plazo_meses=None,
+            valor_cuota=cuota_total_mes if cuota_total_mes > 0 else None,
+            proxima_cuota=None,
+            proximo_pago=proximo_pago or proxima_fecha_de_pago(dia_pago),
+            tiene_intereses=tasa > 0,
+            descripcion=descripcion,
+            activa=activa,
+        ),
         "detalle": {
             "cupo_total": cupo_total,
             "dia_corte": dia_corte,
@@ -174,41 +227,31 @@ def validar_vehiculo(
 ) -> dict:
     plazo_meses = (anos * 12) + meses
 
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad financiera.")
-    if monto_inicial <= 0:
-        raise ValueError("El monto financiado debe ser mayor a cero.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo actual debe ser mayor a cero.")
-    if saldo_actual > monto_inicial:
-        raise ValueError("El saldo actual no puede ser mayor al monto financiado.")
-    if plazo_meses <= 0:
-        raise ValueError("El plazo del crédito debe ser mayor a 0 meses.")
-    if cuota_proxima > plazo_meses:
-        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota debe ser mayor a cero.")
-    if fecha_inicio is not None and fecha_inicio > proximo_pago:
-        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+    _exigir(not entidad.strip(), "Ingresa la entidad financiera.")
+    _exigir(monto_inicial <= 0, "El monto financiado debe ser mayor a cero.")
+    _exigir(saldo_actual <= 0, "El saldo actual debe ser mayor a cero.")
+    _exigir(saldo_actual > monto_inicial, "El saldo actual no puede ser mayor al monto financiado.")
+    _exigir(plazo_meses <= 0, "El plazo del crédito debe ser mayor a 0 meses.")
+    _exigir(cuota_proxima > plazo_meses, "La próxima cuota no puede superar el total de cuotas.")
+    _exigir(valor_cuota <= 0, "El valor de la cuota debe ser mayor a cero.")
+    _exigir_inicio_no_posterior(fecha_inicio, proximo_pago)
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "nombre": (nombre or "").strip() or None,
-            "monto_inicial": monto_inicial,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "FIJA",
-            "plazo_meses": plazo_meses,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": cuota_proxima,
-            "fecha_proximo_pago": proximo_pago,
-            "fecha_inicio": fecha_inicio,
-            "descripcion": (descripcion or "").strip() or None,
-            "estado": "ACTIVA" if activa else "CANCELADA",
-        },
+        "base": _base_credito(
+            entidad=entidad.strip(),
+            nombre=nombre,
+            monto_inicial=monto_inicial,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            plazo_meses=plazo_meses,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+            fecha_inicio=fecha_inicio,
+            descripcion=descripcion,
+            activa=activa,
+        ),
         "detalle": {
             "tipo_vehiculo": tipo_vehiculo,
             "marca": marca,
@@ -227,10 +270,9 @@ def validar_educativo(
     tasa: float,
     valor_cuota: float,
     proximo_pago: date,
+    plazo_meses: int,
     carrera: str | None = None,
     modalidad: str = "En amortización",
-    cuotas_pendientes: int | None = None,
-    plazo_meses: int | None = None,
     cuota_proxima: int = 1,
     monto_inicial: float = 0,
     periodicidad_tasa: str = "EA",
@@ -239,48 +281,37 @@ def validar_educativo(
     descripcion: str | None = None,
     activa: bool = True,
 ) -> dict:
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad o institución del crédito educativo.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo actual debe ser mayor a cero.")
-    if monto_inicial > 0 and saldo_actual > monto_inicial:
-        raise ValueError("El saldo actual no puede ser mayor al monto inicial.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
-    if fecha_inicio is not None and fecha_inicio > proximo_pago:
-        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+    _exigir(not entidad.strip(), "Ingresa la entidad o institución del crédito educativo.")
+    _exigir(saldo_actual <= 0, "El saldo actual debe ser mayor a cero.")
+    _exigir(
+        monto_inicial > 0 and saldo_actual > monto_inicial,
+        "El saldo actual no puede ser mayor al monto inicial.",
+    )
+    _exigir(valor_cuota <= 0, "El valor de la cuota mensual debe ser mayor a cero.")
+    _exigir_inicio_no_posterior(fecha_inicio, proximo_pago)
 
-    if plazo_meses is None:
-        # Contrato anterior: el plazo total es el número de cuotas por pagar.
-        total_cuotas = cuotas_pendientes or 24
-        proxima_cuota = 1
-    else:
-        total_cuotas = plazo_meses
-        proxima_cuota = cuota_proxima
-    if proxima_cuota > total_cuotas:
-        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
+    _exigir(plazo_meses <= 0, "El plazo debe ser mayor a 0 meses.")
+    _exigir(cuota_proxima > plazo_meses, "La próxima cuota no puede superar el total de cuotas.")
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "nombre": (nombre or "").strip() or None,
-            "monto_inicial": monto_inicial or saldo_actual,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "FIJA",
-            "plazo_meses": total_cuotas,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": proxima_cuota,
-            "fecha_proximo_pago": proximo_pago,
-            "fecha_inicio": fecha_inicio,
-            "descripcion": (descripcion or "").strip() or None,
-            "estado": "ACTIVA" if activa else "CANCELADA",
-        },
+        "base": _base_credito(
+            entidad=entidad.strip(),
+            nombre=nombre,
+            monto_inicial=monto_inicial or saldo_actual,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            plazo_meses=plazo_meses,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+            fecha_inicio=fecha_inicio,
+            descripcion=descripcion,
+            activa=activa,
+        ),
         "detalle": {
             "institucion": entidad.strip(),
-            "programa": (carrera or "").strip() or None,
+            "programa": _texto(carrera),
             "modalidad": modalidad or None,
             "beneficiario": None,
         },
@@ -303,41 +334,31 @@ def validar_otros(
     descripcion: str | None = None,
     activa: bool = True,
 ) -> dict:
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad o la persona a quien le debes.")
-    if monto_inicial <= 0:
-        raise ValueError("El monto total de la deuda debe ser mayor a cero.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo actual debe ser mayor a cero.")
-    if saldo_actual > monto_inicial:
-        raise ValueError("El saldo actual no puede ser mayor al monto total.")
-    if plazo_meses <= 0:
-        raise ValueError("El plazo debe ser mayor a 0 meses.")
-    if cuota_proxima > plazo_meses:
-        raise ValueError("La próxima cuota no puede superar el total de cuotas.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
-    if fecha_inicio is not None and fecha_inicio > proximo_pago:
-        raise ValueError("La fecha de inicio no puede ser posterior al próximo pago.")
+    _exigir(not entidad.strip(), "Ingresa la entidad o la persona a quien le debes.")
+    _exigir(monto_inicial <= 0, "El monto total de la deuda debe ser mayor a cero.")
+    _exigir(saldo_actual <= 0, "El saldo actual debe ser mayor a cero.")
+    _exigir(saldo_actual > monto_inicial, "El saldo actual no puede ser mayor al monto total.")
+    _exigir(plazo_meses <= 0, "El plazo debe ser mayor a 0 meses.")
+    _exigir(cuota_proxima > plazo_meses, "La próxima cuota no puede superar el total de cuotas.")
+    _exigir(valor_cuota <= 0, "El valor de la cuota mensual debe ser mayor a cero.")
+    _exigir_inicio_no_posterior(fecha_inicio, proximo_pago)
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "nombre": (nombre or "").strip() or None,
-            "monto_inicial": monto_inicial,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "FIJA",
-            "plazo_meses": plazo_meses,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": cuota_proxima,
-            "fecha_proximo_pago": proximo_pago,
-            "fecha_inicio": fecha_inicio,
-            "descripcion": (descripcion or "").strip() or None,
-            "estado": "ACTIVA" if activa else "CANCELADA",
-        },
+        "base": _base_credito(
+            entidad=entidad.strip(),
+            nombre=nombre,
+            monto_inicial=monto_inicial,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            plazo_meses=plazo_meses,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+            fecha_inicio=fecha_inicio,
+            descripcion=descripcion,
+            activa=activa,
+        ),
         "detalle": {"tipo_credito": tipo_credito},
     }
 
@@ -353,33 +374,25 @@ def validar_libre_inversion(
     valor_cuota: float,
     proximo_pago: date,
 ) -> dict:
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad financiera.")
-    if monto_inicial <= 0:
-        raise ValueError("El monto inicial debe ser mayor a cero.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo pendiente debe ser mayor a cero.")
-    if saldo_actual > monto_inicial:
-        raise ValueError("El saldo pendiente no puede superar el monto inicial.")
-    if cuota_proxima > total_meses:
-        raise ValueError("La próxima cuota no puede ser superior al total de cuotas.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
+    _exigir(not entidad.strip(), "Ingresa la entidad financiera.")
+    _exigir(monto_inicial <= 0, "El monto inicial debe ser mayor a cero.")
+    _exigir(saldo_actual <= 0, "El saldo pendiente debe ser mayor a cero.")
+    _exigir(saldo_actual > monto_inicial, "El saldo pendiente no puede superar el monto inicial.")
+    _exigir(cuota_proxima > total_meses, "La próxima cuota no puede ser superior al total de cuotas.")
+    _exigir(valor_cuota <= 0, "El valor de la cuota mensual debe ser mayor a cero.")
 
     return {
-        "base": {
-            "entidad": entidad.strip(),
-            "monto_inicial": monto_inicial,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "FIJA",
-            "plazo_meses": total_meses,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": cuota_proxima,
-            "fecha_proximo_pago": proximo_pago,
-        },
+        "base": _base_credito(
+            entidad=entidad.strip(),
+            monto_inicial=monto_inicial,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            plazo_meses=total_meses,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+        ),
         "detalle": None,
     }
 
@@ -393,31 +406,29 @@ def validar_prestamo_personal(
     valor_cuota: float,
     proximo_pago: date,
 ) -> dict:
-    if not prestamista.strip():
-        raise ValueError("Ingresa el nombre del prestamista o acreedor.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo pendiente debe ser mayor a cero.")
-    if monto_inicial > 0 and saldo_actual > monto_inicial:
-        raise ValueError("El saldo pendiente no puede superar el monto inicial.")
-    if valor_cuota <= 0:
-        raise ValueError("El abono mensual acordado debe ser mayor a cero.")
+    _exigir(not prestamista.strip(), "Ingresa el nombre del prestamista o acreedor.")
+    _exigir(saldo_actual <= 0, "El saldo pendiente debe ser mayor a cero.")
+    _exigir(
+        monto_inicial > 0 and saldo_actual > monto_inicial,
+        "El saldo pendiente no puede superar el monto inicial.",
+    )
+    _exigir(valor_cuota <= 0, "El abono mensual acordado debe ser mayor a cero.")
 
-    nombre = f"{prestamista.strip()} ({tipo_relacion})"
-
+    tiene_intereses = tasa > 0
     return {
-        "base": {
-            "entidad": nombre,
-            "monto_inicial": monto_inicial or saldo_actual,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa if tasa > 0 else None,
-            "periodicidad_tasa": "MENSUAL" if tasa > 0 else None,
-            "tipo_tasa": None,
-            "plazo_meses": None,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": None,
-            "fecha_proximo_pago": proximo_pago,
-        },
+        "base": _base_deuda(
+            entidad=f"{prestamista.strip()} ({tipo_relacion})",
+            monto_inicial=monto_inicial or saldo_actual,
+            saldo_actual=saldo_actual,
+            tasa=tasa if tiene_intereses else None,
+            periodicidad_tasa="MENSUAL" if tiene_intereses else None,
+            tipo_tasa=None,
+            plazo_meses=None,
+            valor_cuota=valor_cuota,
+            proxima_cuota=None,
+            proximo_pago=proximo_pago,
+            tiene_intereses=tiene_intereses,
+        ),
         "detalle": None,
     }
 
@@ -434,35 +445,31 @@ def validar_consumo(
     valor_cuota: float,
     proximo_pago: date,
 ) -> dict:
-    if not entidad.strip():
-        raise ValueError("Ingresa la entidad o comercio del crédito.")
-    if saldo_actual <= 0:
-        raise ValueError("El saldo actual debe ser mayor a cero.")
-    if monto_inicial > 0 and saldo_actual > monto_inicial:
-        raise ValueError("El saldo actual no puede ser mayor al monto inicial.")
-    if cuota_proxima > total_cuotas:
-        raise ValueError("La próxima cuota no puede ser superior al total de cuotas.")
-    if valor_cuota <= 0:
-        raise ValueError("El valor de la cuota mensual debe ser mayor a cero.")
+    _exigir(not entidad.strip(), "Ingresa la entidad o comercio del crédito.")
+    _exigir(saldo_actual <= 0, "El saldo actual debe ser mayor a cero.")
+    _exigir(
+        monto_inicial > 0 and saldo_actual > monto_inicial,
+        "El saldo actual no puede ser mayor al monto inicial.",
+    )
+    _exigir(cuota_proxima > total_cuotas, "La próxima cuota no puede ser superior al total de cuotas.")
+    _exigir(valor_cuota <= 0, "El valor de la cuota mensual debe ser mayor a cero.")
 
     nombre = entidad.strip()
     if articulo.strip():
         nombre += f" ({articulo.strip()})"
 
     return {
-        "base": {
-            "entidad": nombre,
-            "monto_inicial": monto_inicial or saldo_actual,
-            "saldo_actual": saldo_actual,
-            "tiene_intereses": tasa > 0,
-            "tasa_interes": tasa,
-            "periodicidad_tasa": periodicidad_tasa,
-            "tipo_tasa": "FIJA",
-            "plazo_meses": total_cuotas,
-            "valor_cuota": valor_cuota,
-            "proxima_cuota": cuota_proxima,
-            "fecha_proximo_pago": proximo_pago,
-        },
+        "base": _base_credito(
+            entidad=nombre,
+            monto_inicial=monto_inicial or saldo_actual,
+            saldo_actual=saldo_actual,
+            tasa=tasa,
+            periodicidad_tasa=periodicidad_tasa,
+            plazo_meses=total_cuotas,
+            valor_cuota=valor_cuota,
+            proxima_cuota=cuota_proxima,
+            proximo_pago=proximo_pago,
+        ),
         "detalle": None,
     }
 

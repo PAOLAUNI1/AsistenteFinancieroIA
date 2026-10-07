@@ -7,7 +7,6 @@ esquema cambia en la base de datos, estos modelos deben actualizarse a mano.
 
 from datetime import date, datetime
 
-from sqlalchemy.dialects import mysql
 from sqlalchemy import (
     Boolean,
     Date,
@@ -19,10 +18,11 @@ from sqlalchemy import (
     SmallInteger,
     String,
 )
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
-
+from backend.tiempo import ahora_utc, hoy_colombia
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -37,9 +37,9 @@ class Usuario(Base):
     estado: Mapped[str] = mapped_column(
         Enum("ACTIVO", "INACTIVO", name="estado_usuario"), nullable=False, default="ACTIVO"
     )
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
     fecha_actualizacion: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=ahora_utc, onupdate=ahora_utc
     )
 
 
@@ -101,9 +101,9 @@ class Deuda(Base):
         nullable=False,
         default="ACTIVA",
     )
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
     fecha_actualizacion: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=ahora_utc, onupdate=ahora_utc
     )
 
     tipo_deuda: Mapped[TipoDeuda] = relationship(lazy="joined")
@@ -181,7 +181,7 @@ class CompraTarjeta(Base):
     cuotas_pagadas: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     genera_intereses: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     tasa_interes: Mapped[float | None] = mapped_column(Numeric(7, 4), nullable=True)
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
 
 class PagoDeuda(Base):
@@ -198,7 +198,7 @@ class PagoDeuda(Base):
     intereses: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     saldo_despues: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     observacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
 
 class Ingreso(Base):
@@ -212,9 +212,9 @@ class Ingreso(Base):
     periodicidad: Mapped[str] = mapped_column(
         Enum("MENSUAL", "UNICO", name="periodicidad_ingreso"), nullable=False, default="MENSUAL"
     )
-    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    fecha: Mapped[date] = mapped_column(Date, default=hoy_colombia)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
 
 class Gasto(Base):
@@ -228,9 +228,9 @@ class Gasto(Base):
     periodicidad: Mapped[str] = mapped_column(
         Enum("MENSUAL", "UNICO", name="periodicidad_gasto"), nullable=False, default="MENSUAL"
     )
-    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    fecha: Mapped[date] = mapped_column(Date, default=hoy_colombia)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
     categoria: Mapped[CategoriaGasto] = relationship(lazy="joined")
 
@@ -252,7 +252,7 @@ class MetaAhorro(Base):
         nullable=False,
         default="ACTIVA",
     )
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
 
 class AporteMeta(Base):
@@ -261,6 +261,16 @@ class AporteMeta(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     meta_id: Mapped[int] = mapped_column(ForeignKey("metas_ahorro.id"), nullable=False)
     monto: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
-    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    fecha: Mapped[date] = mapped_column(Date, default=hoy_colombia)
     observacion: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
+
+
+# Tabla de detalle 1:1 por código de tipo de deuda (los tipos que no están aquí
+# guardan todo en la tabla base `deudas`).
+DETALLE_POR_TIPO = {
+    "TARJETA": DeudaTarjeta,
+    "VEHICULO": DeudaVehiculo,
+    "EDUCATIVO": DeudaEducativo,
+    "OTRO": DeudaOtro,
+}
