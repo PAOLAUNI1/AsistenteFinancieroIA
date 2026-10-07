@@ -2,10 +2,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from backend.database import Base, engine
 from backend.routers import analisis, catalogos, deudas, perfil, usuarios
 
-Base.metadata.create_all(bind=engine)
+# La estructura de la base se crea con db/schema.sql y db/seed.sql (no con create_all: no
+# genera los CHECK ni los catálogos, y sus tipos de clave no coinciden con los del esquema).
 
 app = FastAPI(
     title="Asistente Financiero Inteligente - API",
