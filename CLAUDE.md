@@ -1034,8 +1034,7 @@ Consumo. Para él (y para cualquier otro tipo nuevo):
 -   Pantalla "Mis deudas" completa ("Ver todas") y calendario de pagos.
 -   Registrar gasto, registrar ahorro y "Analizar con IA".
 -   Camino para que los usuarios antiguos sin contraseña la definan.
--   Renovación de tokens. La app debe mostrar un mensaje propio cuando el login
-    responde 429 (demasiados intentos).
+-   Renovación de tokens.
 
 No modificar los flujos ya implementados salvo que aparezca un error o
 el diseño cambie.
@@ -1096,16 +1095,18 @@ backend/
 ├── main.py            # FastAPI + routers + formato del 422 (sin eco del valor recibido)
 ├── database.py        # engine MySQL (credenciales en bd.env)
 ├── deps.py            # usuario_actual (lee el token Bearer)
-├── models.py          # modelos SQLAlchemy
-├── routers/           # usuarios, catalogos, deudas, perfil, analisis
-├── schemas/           # contratos Pydantic (usuario, deuda, perfil, catalogo)
-├── services/          # reglas: deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (111 pruebas)
+├── models.py          # modelos SQLAlchemy (+ DETALLE_POR_TIPO: tabla de detalle de cada tipo)
+├── tiempo.py          # ahora_utc() para lo guardado y hoy_colombia() para "hoy" (America/Bogota)
+├── routers/           # usuarios, catalogos, deudas, perfil, analisis (solo traducen HTTP)
+├── schemas/           # contratos Pydantic (usuario, deuda, perfil, analisis, catalogo)
+├── services/          # reglas: deudas, repositorio_deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
+├── tests/             # pytest (181 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
 └── seed.sql           # catálogos: tipos de deuda y categorías de gasto
 Dockerfile, .dockerignore, bd.env.example   # despliegue y configuración
+backend/requirements.txt (versiones fijas, para ejecutar) y requirements-dev.txt (más pytest y httpx)
 ```
 
 ## Base de datos
@@ -1208,7 +1209,7 @@ llevaría su cuenta). Cada 401 se crea por petición (`deps._no_autorizado`).
 ## Cómo ejecutar y probar
 
 ``` bash
-pip install -r backend/requirements.txt
+pip install -r backend/requirements-dev.txt   # para solo ejecutar basta requirements.txt
 python -m uvicorn backend.main:app --port 8000
 python -m pytest backend/tests -q
 ```
@@ -1218,8 +1219,9 @@ Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
 (`mysql://usuario:clave@host:puerto/base`) en un servidor en la nube;
 `JWT_SECRET` (obligatoria con `APP_ENV=production`, de 32 caracteres o más; el
 Dockerfile ya fija `APP_ENV`); opcionales `JWT_DIAS` y
-`BCRYPT_ROUNDS`. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`
-(no se pudo probar localmente: no hay Docker instalado).
+`BCRYPT_ROUNDS`. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
+con un usuario sin privilegios y un `HEALTHCHECK` sobre `/health` (no se pudo
+probar localmente: no hay Docker instalado).
 
 La documentación interactiva queda en `/docs`. Las pruebas usan SQLite
 en memoria con los catálogos sembrados, sin tocar MySQL.
@@ -1339,8 +1341,11 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 111 pruebas de pytest (`backend/tests`): servicios de
-    deudas, endpoints, registro, login, aislamiento por usuario.
+-   Backend: 181 pruebas de pytest (`backend/tests`): servicios de
+    deudas, endpoints, registro, login, aislamiento por usuario y
+    `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
+    mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
+    aislamiento).
 -   App: 110 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo), contratos JSON con el backend,
     repositorios, formatos de moneda y fecha.
@@ -1379,24 +1384,22 @@ ui/theme/        # colores y tipografía
     recomendaciones, IA personalizada, alertas y vencimientos (pasos 12 a
     16 de la sección 32).
 -   Poner la app Android bajo control de versiones.
--   **Pendientes de la revisión de código de octubre 2026** (rama `DEV`, ya
-    resueltos: validaciones de entrada, `JWT_SECRET`, `create_all`, 401,
-    errores de registro y límite de login):
-    -   Fecha de pago de la tarjeta: `proxima_fecha_de_pago` usa
-        `date.today()` (hora del servidor, UTC en la nube); calcular con la
-        zona `America/Bogota`.
+-   **Pendientes de la revisión de código de octubre 2026** (rama `DEV`).
+    Resueltos: validaciones de entrada, `JWT_SECRET`, `create_all`, 401,
+    errores de registro, límite de login, fecha de pago de la tarjeta con
+    la zona `America/Bogota` (`tiempo.py`), Dockerfile (usuario sin
+    privilegios, versiones fijas, `HEALTHCHECK`), calidad del backend
+    (persistencia en `services/repositorio_deudas.py` con listado sin N+1, ocho
+    endpoints `POST /deudas/*` generados desde `ESQUEMAS_POR_TIPO` y
+    `VALIDADORES_POR_TIPO`, base común `_base_deuda`/`_base_credito` en los
+    validadores, `/analisis` con `response_model`, pruebas por tipo),
+    contrato antiguo de educación eliminado (`plazo_meses` es obligatorio) y,
+    en la app, plazo máximo de 40 años y mensaje propio ante el 429.
+    Siguen abiertos:
     -   Conexión a MySQL: sin TLS y con `root` sin contraseña por defecto si
-        faltan las variables.
-    -   Dockerfile: usuario no root, versiones fijas de dependencias
-        (separar las de pruebas) y `HEALTHCHECK`.
+        faltan las variables (necesario resolver con el servidor compartido).
     -   Dinero como `float` en schemas y servicios: pasar a `Decimal` antes
         del registro de pagos.
-    -   Calidad: los ocho endpoints `POST /deudas/*` y los ocho validadores
-        repiten estructura (registro único de tipos, constructor común de la
-        base, validación común de cuotas), el router hace persistencia
-        (`_registrar`, borrado en cascada, N+1 en el listado), análisis sin
-        `response_model`, tests con casos repetidos por tipo y sin pruebas
-        de endpoint para libre inversión, préstamo personal y consumo.
-    -   `validar_educativo` conserva un contrato anterior (inventa 24 meses
-        si no llega plazo) que la app ya no usa.
-    -   La app Android debe mostrar un mensaje propio ante el 429 del login.
+    -   Los validadores aún repiten las comprobaciones (entidad, saldo,
+        cuotas) con textos distintos por tipo; unificarlos cambiaría los
+        mensajes de error.
