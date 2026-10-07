@@ -1100,7 +1100,7 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis (solo traducen HTTP)
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, analisis, catalogo)
 ├── services/          # reglas: deudas, repositorio_deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (181 pruebas)
+├── tests/             # pytest (241 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
@@ -1341,11 +1341,13 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 181 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 241 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
-    aislamiento).
+    aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
+    cada error de validación (la app los muestra tal cual: cualquier cambio en
+    los validadores debe mantenerlos).
 -   App: 110 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo), contratos JSON con el backend,
     repositorios, formatos de moneda y fecha.

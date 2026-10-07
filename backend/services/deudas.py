@@ -457,6 +457,8 @@ def validar_consumo(
     nombre = entidad.strip()
     if articulo.strip():
         nombre += f" ({articulo.strip()})"
+    # La columna deudas.entidad admite 100 caracteres y el nombre lleva el artículo entre paréntesis.
+    _exigir(len(nombre) > 100, "El comercio y el artículo juntos no pueden superar los 100 caracteres.")
 
     return {
         "base": _base_credito(

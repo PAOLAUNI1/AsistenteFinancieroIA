@@ -4,6 +4,7 @@ Persistencia de las deudas: guardar una deuda con su tabla de detalle, listarlas
 Los routers solo traducen HTTP; todo lo que toca la base está aquí.
 """
 
+import logging
 from decimal import Decimal
 
 from sqlalchemy.exc import DataError, IntegrityError
@@ -17,6 +18,8 @@ from backend.models import (
     TipoDeuda,
 )
 from backend.schemas.deuda import DeudaOut
+
+logger = logging.getLogger(__name__)
 
 
 class DeudaNoGuardada(Exception):
@@ -42,6 +45,8 @@ def registrar_deuda(db: Session, usuario_id: int, codigo_tipo: str, resultado: d
         db.commit()
     except (DataError, IntegrityError) as exc:
         db.rollback()
+        # El usuario solo ve un 422 genérico; el motivo real queda en el log.
+        logger.warning("MySQL rechazó la deuda de tipo %s del usuario %s: %s", codigo_tipo, usuario_id, exc.orig)
         raise DeudaNoGuardada() from exc
     db.refresh(deuda)
     return deuda

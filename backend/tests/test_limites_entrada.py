@@ -148,3 +148,27 @@ def test_el_422_no_devuelve_el_valor_recibido(client):
     )
     assert respuesta.status_code == 422
     assert "Secreta12345" not in respuesta.text
+
+
+def test_consumo_con_comercio_y_articulo_demasiado_largos_da_422_con_mensaje(client, usuario_id):
+    # 100 + 30 caracteres caben en el esquema, pero el nombre guardado ("comercio (artículo)")
+    # pasaría de las 100 que admite la columna deudas.entidad.
+    respuesta = client.post(
+        "/deudas/consumo",
+        params={"usuario_id": usuario_id},
+        json=_consumo(entidad="E" * 100, articulo="A" * 30),
+    )
+
+    assert respuesta.status_code == 422
+    assert "100 caracteres" in respuesta.json()["detail"]
+
+
+def test_consumo_con_comercio_y_articulo_que_suman_100_se_registra(client, usuario_id):
+    respuesta = client.post(
+        "/deudas/consumo",
+        params={"usuario_id": usuario_id},
+        json=_consumo(entidad="E" * 67, articulo="A" * 30),
+    )
+
+    assert respuesta.status_code == 201
+    assert len(respuesta.json()["entidad"]) == 100

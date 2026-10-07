@@ -1,5 +1,8 @@
-"""Persistencia de deudas: consultas acotadas y endpoints de registro generados desde un solo registro."""
+﻿"""Persistencia de deudas: consultas acotadas y endpoints de registro generados desde un solo registro."""
 
+import logging
+
+import pytest
 from sqlalchemy import event
 
 from backend.main import app
@@ -99,3 +102,27 @@ def test_la_documentacion_de_la_api_lista_los_ocho_endpoints_de_registro_con_ids
         assert post["requestBody"], tipo
 
     assert len(set(operaciones)) == 8
+
+
+def test_una_deuda_rechazada_por_la_base_deja_el_motivo_en_el_log(client, usuario_id, monkeypatch, caplog):
+    from sqlalchemy.exc import IntegrityError
+
+    from backend.routers.deudas import ESQUEMAS_POR_TIPO
+    from backend.services import repositorio_deudas as repo
+    from backend.services.deudas import VALIDADORES_POR_TIPO
+    from backend.tests.test_registro_por_tipo import VALIDOS
+
+    codigo, validar = VALIDADORES_POR_TIPO["hipotecario"]
+    resultado = validar(**ESQUEMAS_POR_TIPO["hipotecario"](**VALIDOS["hipotecario"]).model_dump())
+
+    with client.session_factory() as db:
+        def commit_rechazado():
+            raise IntegrityError("INSERT", {}, Exception("chk_deudas_tasa incumplido"))
+
+        monkeypatch.setattr(db, "commit", commit_rechazado)
+
+        with caplog.at_level(logging.WARNING, logger=repo.__name__):
+            with pytest.raises(repo.DeudaNoGuardada):
+                repo.registrar_deuda(db, usuario_id, codigo, resultado)
+
+    assert "chk_deudas_tasa incumplido" in caplog.text
