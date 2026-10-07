@@ -1,0 +1,4 @@
+# Para desarrollar y probar: lo de ejecución más las herramientas de pruebas.
+-r requirements.txt
+pytest==9.1.1
+httpx==0.28.1

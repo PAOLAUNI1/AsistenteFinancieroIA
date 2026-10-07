@@ -1,12 +1,12 @@
-fastapi>=0.115
-uvicorn[standard]>=0.30
-sqlalchemy>=2.0
-pydantic>=2.7
-email-validator>=2.0
-pymysql>=1.1
-cryptography>=42.0
-python-dotenv>=1.0
-bcrypt>=4.2
-PyJWT>=2.8
-pytest>=8.0
-httpx>=0.27
+# Dependencias para ejecutar el backend (versiones fijas para que el servidor sea reproducible).
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sqlalchemy==2.0.52
+pydantic==2.13.5
+email-validator==2.3.0
+pymysql==1.2.3
+cryptography==50.0.2
+python-dotenv==1.2.3
+bcrypt==5.0.0
+PyJWT==2.15.1
+tzdata==2026.5
