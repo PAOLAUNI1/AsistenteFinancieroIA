@@ -397,6 +397,8 @@ def validar_prestamo_personal(
         raise ValueError("Ingresa el nombre del prestamista o acreedor.")
     if saldo_actual <= 0:
         raise ValueError("El saldo pendiente debe ser mayor a cero.")
+    if monto_inicial > 0 and saldo_actual > monto_inicial:
+        raise ValueError("El saldo pendiente no puede superar el monto inicial.")
     if valor_cuota <= 0:
         raise ValueError("El abono mensual acordado debe ser mayor a cero.")
 
@@ -436,6 +438,8 @@ def validar_consumo(
         raise ValueError("Ingresa la entidad o comercio del crédito.")
     if saldo_actual <= 0:
         raise ValueError("El saldo actual debe ser mayor a cero.")
+    if monto_inicial > 0 and saldo_actual > monto_inicial:
+        raise ValueError("El saldo actual no puede ser mayor al monto inicial.")
     if cuota_proxima > total_cuotas:
         raise ValueError("La próxima cuota no puede ser superior al total de cuotas.")
     if valor_cuota <= 0:

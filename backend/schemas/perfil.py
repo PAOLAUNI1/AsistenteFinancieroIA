@@ -1,18 +1,24 @@
+from typing import Annotated
+
 from pydantic import BaseModel, ConfigDict, Field
+
+from backend.schemas.deuda import MAX_MONTO, MontoPositivo
+
+Monto = Annotated[float, Field(ge=0, le=MAX_MONTO, allow_inf_nan=False)]
 
 
 class PerfilIn(BaseModel):
-    salario_mensual: float = Field(ge=0, default=0.0)
-    otros_ingresos: float = Field(ge=0, default=0.0)
-    cantidad_hijos: int = Field(ge=0, default=0)
-    pago_colegio: float = Field(ge=0, default=0.0)
-    pago_universidad: float = Field(ge=0, default=0.0)
-    alimentacion: float = Field(ge=0, default=0.0)
-    transporte: float = Field(ge=0, default=0.0)
-    vestimenta: float = Field(ge=0, default=0.0)
-    entretenimiento: float = Field(ge=0, default=0.0)
-    arriendo_hipoteca: float = Field(ge=0, default=0.0)
-    servicios_publicos: float = Field(ge=0, default=0.0)
+    salario_mensual: Monto = 0.0
+    otros_ingresos: Monto = 0.0
+    cantidad_hijos: int = Field(ge=0, le=30, default=0)
+    pago_colegio: Monto = 0.0
+    pago_universidad: Monto = 0.0
+    alimentacion: Monto = 0.0
+    transporte: Monto = 0.0
+    vestimenta: Monto = 0.0
+    entretenimiento: Monto = 0.0
+    arriendo_hipoteca: Monto = 0.0
+    servicios_publicos: Monto = 0.0
 
 
 class PerfilOut(PerfilIn):
@@ -20,7 +26,7 @@ class PerfilOut(PerfilIn):
 
 
 class MetaAhorroIn(BaseModel):
-    monto_objetivo: float = Field(gt=0)
+    monto_objetivo: MontoPositivo
 
 
 class MetaAhorroOut(BaseModel):

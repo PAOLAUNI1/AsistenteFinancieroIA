@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -91,14 +92,19 @@ def _registrar(db: Session, usuario: Usuario, tipo_slug: str, resultado: dict) -
     tipo_deuda = db.query(TipoDeuda).filter(TipoDeuda.codigo == codigo_tipo).one()
 
     deuda = Deuda(usuario_id=usuario.id, tipo_deuda_id=tipo_deuda.id, **resultado["base"])
-    db.add(deuda)
-    db.flush()  # asigna deuda.id sin cerrar la transacción
+    try:
+        db.add(deuda)
+        db.flush()  # asigna deuda.id sin cerrar la transacción
 
-    if resultado["detalle"] is not None:
-        modelo_detalle = MODELOS_DETALLE[codigo_tipo]
-        db.add(modelo_detalle(deuda_id=deuda.id, **resultado["detalle"]))
+        if resultado["detalle"] is not None:
+            modelo_detalle = MODELOS_DETALLE[codigo_tipo]
+            db.add(modelo_detalle(deuda_id=deuda.id, **resultado["detalle"]))
 
-    db.commit()
+        db.commit()
+    except (DataError, IntegrityError):
+        # Dato fuera de rango o regla de la base incumplida que la validación no cubrió.
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Los datos de la deuda no son válidos.")
     db.refresh(deuda)
     return _a_deuda_out(deuda, db)
 
