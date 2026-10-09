@@ -7,7 +7,7 @@ def render_formulario(suffix="_educativo"):
     """
     Renderiza el formulario para registrar un Crédito Educativo.
     """
-    st.markdown("##### 🎓 Datos del Crédito Educativo")
+    st.markdown("##### Datos del Crédito Educativo")
 
     col_ed1, col_ed2 = st.columns(2)
     with col_ed1:
@@ -85,7 +85,7 @@ def render_formulario(suffix="_educativo"):
     saldo_actual_num = limpiar_moneda_decimal(saldo_actual)
     valor_cuota_num = limpiar_moneda_decimal(valor_cuota)
 
-    if st.button("➕ Registrar crédito educativo", key=f"btn_reg{suffix}"):
+    if st.button("Registrar crédito educativo", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad o institución del crédito educativo.")
         elif saldo_actual_num <= 0:
@@ -99,7 +99,6 @@ def render_formulario(suffix="_educativo"):
 
             nueva_deuda = {
                 "tipo": "Crédito educativo",
-                "icono": "🎓",
                 "entidad": nombre,
                 "monto_inicial": monto_inicial_num or saldo_actual_num,
                 "saldo_actual": saldo_actual_num,

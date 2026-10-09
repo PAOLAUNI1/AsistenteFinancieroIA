@@ -7,7 +7,7 @@ def render_formulario(suffix="_libre"):
     """
     Renderiza el formulario para registrar un Préstamo de Libre Inversión.
     """
-    st.markdown("##### 💰 Datos del Préstamo de Libre Inversión")
+    st.markdown("##### Datos del Préstamo de Libre Inversión")
 
     entidad = st.text_input(
         "Entidad bancaria o financiera",
@@ -84,7 +84,7 @@ def render_formulario(suffix="_libre"):
         with c2:
             st.caption(f"Cuotas pendientes: **{cuotas_pendientes}**")
 
-    if st.button("➕ Registrar préstamo de libre inversión", key=f"btn_reg{suffix}"):
+    if st.button("Registrar préstamo de libre inversión", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad financiera.")
         elif monto_inicial_num <= 0:
@@ -100,7 +100,6 @@ def render_formulario(suffix="_libre"):
         else:
             nueva_deuda = {
                 "tipo": "Préstamo de libre inversión",
-                "icono": "💰",
                 "entidad": entidad.strip(),
                 "monto_inicial": monto_inicial_num,
                 "saldo_actual": saldo_actual_num,

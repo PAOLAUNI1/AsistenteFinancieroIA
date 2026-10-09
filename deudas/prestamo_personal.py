@@ -7,7 +7,7 @@ def render_formulario(suffix="_personal"):
     """
     Renderiza el formulario para registrar un Préstamo Personal / Informal.
     """
-    st.markdown("##### 🤝 Datos del Préstamo Personal")
+    st.markdown("##### Datos del Préstamo Personal")
 
     col_p1, col_p2 = st.columns(2)
     with col_p1:
@@ -66,7 +66,7 @@ def render_formulario(suffix="_personal"):
         cuotas_est = int(round(saldo_actual_num / valor_cuota_num))
         st.caption(f"Tiempo estimado para terminar de pagar: **~{cuotas_est} pagos mensuales**")
 
-    if st.button("➕ Registrar préstamo personal", key=f"btn_reg{suffix}"):
+    if st.button("Registrar préstamo personal", key=f"btn_reg{suffix}"):
         if not prestamista.strip():
             st.error("Ingresa el nombre del prestamista o acreedor.")
         elif saldo_actual_num <= 0:
@@ -77,7 +77,6 @@ def render_formulario(suffix="_personal"):
             nombre = f"{prestamista.strip()} ({tipo_relacion})"
             nueva_deuda = {
                 "tipo": "Préstamo personal",
-                "icono": "🤝",
                 "entidad": nombre,
                 "monto_inicial": monto_inicial_num or saldo_actual_num,
                 "saldo_actual": saldo_actual_num,

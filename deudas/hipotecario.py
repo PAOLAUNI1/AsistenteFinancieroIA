@@ -7,7 +7,7 @@ def render_formulario(suffix="_hipo"):
     """
     Renderiza el formulario para registrar un Crédito Hipotecario.
     """
-    st.markdown("##### 🏠 Datos del Crédito Hipotecario")
+    st.markdown("##### Datos del Crédito Hipotecario")
 
     entidad = st.text_input(
         "Entidad financiera / Banco",
@@ -102,7 +102,7 @@ def render_formulario(suffix="_hipo"):
             st.caption(f"Cuotas pendientes por pagar: **{cuotas_pendientes}**")
 
     # Botón de registro
-    if st.button("➕ Registrar crédito hipotecario", key=f"btn_reg{suffix}"):
+    if st.button("Registrar crédito hipotecario", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad financiera.")
         elif monto_inicial_num <= 0:
@@ -122,7 +122,6 @@ def render_formulario(suffix="_hipo"):
         else:
             nueva_deuda = {
                 "tipo": "Crédito hipotecario",
-                "icono": "🏠",
                 "entidad": entidad.strip(),
                 "monto_inicial": monto_inicial_num,
                 "saldo_actual": saldo_actual_num,
