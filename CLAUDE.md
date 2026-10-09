@@ -1100,7 +1100,7 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, perfil, analisis (solo traducen HTTP)
 ├── schemas/           # contratos Pydantic (usuario, deuda, perfil, analisis, catalogo)
 ├── services/          # reglas: deudas, repositorio_deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (246 pruebas)
+├── tests/             # pytest (252 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
@@ -1220,7 +1220,7 @@ Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
 `JWT_SECRET` (obligatoria con `APP_ENV=production`, de 32 caracteres o más; el
 Dockerfile ya fija `APP_ENV`); opcionales `JWT_DIAS` y
 `BCRYPT_ROUNDS`. Si la base exige TLS: `DB_SSL_CA_PEM` (contenido del `ca.pem`
-del proveedor), `DB_SSL_CA` (ruta) o `DB_SSL=true` (`backend/database.py`). El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
+del proveedor), `DB_SSL_CA` (ruta) o `DB_SSL=true` (`backend/database.py`). La URL de Aiven trae `?ssl-mode=REQUIRED`: `database.py` lo quita de la URL (PyMySQL no lo acepta) y lo traduce a TLS. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
 con un usuario sin privilegios y un `HEALTHCHECK` sobre `/health` (no se pudo
 probar localmente: no hay Docker instalado).
 
@@ -1342,7 +1342,7 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 246 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 252 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,

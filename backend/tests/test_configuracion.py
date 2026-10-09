@@ -144,3 +144,54 @@ def test_db_ssl_true_cifra_validando_tambien_el_nombre(monkeypatch):
     monkeypatch.setenv("DB_SSL", "true")
 
     assert database._argumentos_de_conexion()["ssl"].check_hostname is True
+
+
+def test_el_ssl_mode_de_la_url_de_aiven_se_quita_de_la_url_y_se_devuelve_aparte():
+    url, modo = database._separar_modo_ssl("mysql+pymysql://avnadmin:p%40ss@host.aivencloud.com:12345/defaultdb?ssl-mode=REQUIRED&charset=utf8mb4")
+
+    assert modo == "REQUIRED"
+    assert "ssl-mode" not in url
+    assert "charset=utf8mb4" in url
+    assert "p%40ss" in url  # la contraseña con caracteres especiales sobrevive intacta
+
+
+def test_una_url_sin_parametros_ssl_no_cambia():
+    original = "mysql+pymysql://u:p@h:3306/b?charset=utf8mb4"
+
+    assert database._separar_modo_ssl(original) == (original, None)
+
+
+def test_ssl_mode_required_sin_certificado_cifra_sin_validar(monkeypatch):
+    import ssl
+
+    _sin_variables_tls(monkeypatch)
+
+    contexto = database._argumentos_de_conexion("REQUIRED")["ssl"]
+
+    assert contexto.verify_mode == ssl.CERT_NONE
+    assert contexto.check_hostname is False
+
+
+def test_ssl_mode_required_con_certificado_valida_la_cadena(monkeypatch):
+    import ssl
+
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("DB_SSL_CA_PEM", _certificado_de_prueba())
+
+    assert database._argumentos_de_conexion("REQUIRED")["ssl"].verify_mode == ssl.CERT_REQUIRED
+
+
+def test_ssl_mode_disabled_apaga_el_cifrado(monkeypatch):
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("DB_SSL_CA_PEM", _certificado_de_prueba())
+
+    assert database._argumentos_de_conexion("DISABLED") == {}
+
+
+def test_el_motor_se_crea_con_la_url_de_aiven_sin_el_parametro_que_rompia(monkeypatch):
+    from sqlalchemy import create_engine
+
+    url, modo = database._separar_modo_ssl("mysql+pymysql://u:p@h:3306/b?ssl-mode=REQUIRED")
+    motor = create_engine(url, connect_args=database._argumentos_de_conexion(modo))
+
+    assert "ssl-mode" not in str(motor.url)
