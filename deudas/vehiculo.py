@@ -7,7 +7,7 @@ def render_formulario(suffix="_vehiculo"):
     """
     Renderiza el formulario para registrar un Crédito de Vehículo.
     """
-    st.markdown("##### 🚗 Datos del Crédito de Vehículo")
+    st.markdown("##### Datos del Crédito de Vehículo")
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
@@ -100,7 +100,7 @@ def render_formulario(suffix="_vehiculo"):
             st.caption(f"Cuotas pendientes: **{cuotas_pendientes}**")
 
     # Registro
-    if st.button("➕ Registrar crédito de vehículo", key=f"btn_reg{suffix}"):
+    if st.button("Registrar crédito de vehículo", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad financiera.")
         elif monto_inicial_num <= 0:
@@ -118,7 +118,6 @@ def render_formulario(suffix="_vehiculo"):
 
             nueva_deuda = {
                 "tipo": "Crédito de vehículo",
-                "icono": "🚗",
                 "entidad": descripcion,
                 "monto_inicial": monto_inicial_num,
                 "saldo_actual": saldo_actual_num,

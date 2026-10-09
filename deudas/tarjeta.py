@@ -7,7 +7,7 @@ def render_formulario(suffix="_tarjeta"):
     """
     Renderiza el formulario para registrar una Tarjeta de Crédito.
     """
-    st.markdown("##### 💳 Datos de la Tarjeta de Crédito")
+    st.markdown("##### Datos de la Tarjeta de Crédito")
 
     col_e1, col_e2 = st.columns([1.5, 1])
     with col_e1:
@@ -97,7 +97,7 @@ def render_formulario(suffix="_tarjeta"):
             st.caption(f"Porcentaje de ocupación: **{uso_porcentaje:.1f}%**")
 
     # Registro
-    if st.button("➕ Registrar tarjeta de crédito", key=f"btn_reg{suffix}"):
+    if st.button("Registrar tarjeta de crédito", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad financiera emisora.")
         elif cupo_total_num <= 0:
@@ -113,7 +113,6 @@ def render_formulario(suffix="_tarjeta"):
             nombre_tarjeta = f"{entidad.strip()} ({franquicia})"
             nueva_deuda = {
                 "tipo": "Tarjeta de crédito",
-                "icono": "💳",
                 "entidad": nombre_tarjeta,
                 "monto_inicial": cupo_total_num,
                 "saldo_actual": saldo_actual_num,

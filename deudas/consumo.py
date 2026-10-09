@@ -7,7 +7,7 @@ def render_formulario(suffix="_consumo"):
     """
     Renderiza el formulario para registrar un Crédito de Consumo / Comercio.
     """
-    st.markdown("##### 🛒 Datos del Crédito de Consumo")
+    st.markdown("##### Datos del Crédito de Consumo")
 
     col_c1, col_c2 = st.columns(2)
     with col_c1:
@@ -92,7 +92,7 @@ def render_formulario(suffix="_consumo"):
         with c2:
             st.caption(f"Cuotas pendientes: **{cuotas_pendientes}**")
 
-    if st.button("➕ Registrar crédito de consumo", key=f"btn_reg{suffix}"):
+    if st.button("Registrar crédito de consumo", key=f"btn_reg{suffix}"):
         if not entidad.strip():
             st.error("Ingresa la entidad o comercio del crédito.")
         elif saldo_actual_num <= 0:
@@ -108,7 +108,6 @@ def render_formulario(suffix="_consumo"):
 
             nueva_deuda = {
                 "tipo": "Crédito de consumo",
-                "icono": "🛒",
                 "entidad": nombre,
                 "monto_inicial": monto_inicial_num or saldo_actual_num,
                 "saldo_actual": saldo_actual_num,
