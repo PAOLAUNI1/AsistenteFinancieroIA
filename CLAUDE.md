@@ -1032,7 +1032,7 @@ Consumo. Para él (y para cualquier otro tipo nuevo):
     análisis mensual. Decidir si se pide más adelante (etapa de pagos) o
     si se estima.
 -   Pantalla "Mis deudas" completa ("Ver todas") y calendario de pagos.
--   Registrar gasto, registrar ahorro y "Analizar con IA".
+-   Registrar gasto y "Analizar con IA" (el registro de ahorro ya existe).
 -   Camino para que los usuarios antiguos sin contraseña la definan.
 -   Renovación de tokens.
 
@@ -1251,13 +1251,18 @@ en memoria con los catálogos sembrados, sin tocar MySQL.
     `POST /usuarios`.
 3.  **Inicio de sesión**: correo y contraseña reales (`POST
     /usuarios/login`).
-4.  **Inicio**: saludo, balance del mes (ingresos, gastos, disponible,
-    ahorro), acciones rápidas, **Mis deudas** (hasta 3), **Próximos
-    pagos** (hasta 3) y barra inferior. Los botones de pantallas aún no
-    construidas muestran "Próximamente".
+4.  **Inicio**: saludo, tarjeta verde de balance del mes (disponible) y,
+    debajo, una tarjeta blanca con **Ingresos, Gastos y Ahorros**; acciones
+    rápidas, **Mis ahorros** (hasta 3), **Mis deudas** (hasta 3), **Próximos
+    pagos** (hasta 3) y barra inferior. "Ahorros" es la suma de los ahorros
+    activos en pesos (los de otra moneda no se suman). Los botones de
+    pantallas aún no construidas muestran "Próximamente".
 5.  **Registrar deuda**: lista de tipos (desde `/tipos-deuda`) y el flujo
     de cada tipo; ver la tabla siguiente.
 6.  **Detalle de la deuda**.
+7.  **Registrar ahorro** ("Otro tipo de ahorro"): ver la sección de flujos
+    de ahorro más abajo. Al terminar, "Ver mis ahorros" abre la lista
+    completa (`MisAhorros`) y cada fila abre el detalle del ahorro.
 
 La sesión vive **solo en memoria** (decisión del usuario): al cerrar la
 app siempre se abre en Bienvenida. El token de la sesión (`SesionToken`) también
@@ -1276,6 +1281,23 @@ contraseña incorrectos".
 | Vehículo | Básica (entidad en lista desplegable) → Pago → Adicional → Confirmar | El saldo lo escribe la persona; periodicidad de la cuota solo "Mensual"; próxima fecha de pago en el paso 2 |
 | Educación | Básica (entidad educativa, programa, monto, saldo, tasa, plazo en meses) → Pago → Adicional → Confirmar | Tasa 0 por defecto; plazo total en meses y cuotas pagadas |
 | Otros | Básica (entidad o persona, tipo de otro crédito) → Pago → Adicional → Confirmar | Tipo nuevo `OTRO`; el subtítulo muestra "Juan Pérez (familiar)" |
+
+## Flujo de registro de ahorro
+
+| Pantalla | Contenido |
+|----------|-----------|
+| Registrar ahorro | Seis categorías (cuenta de ahorro, CDT, fondo de inversión, ahorro programado, alcancía y otro). **Solo "Otro" tiene flujo**; las demás muestran "Próximamente" |
+| Otro tipo de ahorro (paso 1) | Ocho subtipos: efectivo, dólares, plan de ahorro, pensión voluntaria, viaje, vivienda, emergencias y personalizado |
+| Registrar otro ahorro (paso 2) | Nombre, descripción (200), monto actual, moneda (COP, USD, EUR) y "¿Es una meta de ahorro?" |
+| Registrar otro ahorro (paso 3) | Si es meta: nombre, monto objetivo y fecha objetivo (opcional); método de ahorro (manual, programado, automático) |
+| Confirmar → Guardando → Éxito | Resumen, "Guardar", "Ver mis ahorros" / "Volver al inicio" |
+| Detalle del ahorro | Monto, meta, progreso (%), fecha objetivo, método y descripción. "Agregar aporte" y "Editar" muestran "Próximamente" |
+
+Si no se marca "es una meta", el paso 3 solo muestra el método y no se envía
+nada de la meta. La fecha objetivo es opcional (el backend la acepta nula).
+El código está en `ui/ahorro/` (`Ahorro.kt` con el formulario y las listas,
+`PasosAhorro.kt`, `ConfirmarAhorroScreen.kt`, `DetalleAhorroScreen.kt`,
+`MisAhorrosScreen.kt` y `RegistroAhorroFlow.kt`).
 
 La lista de tipos de la app muestra solo seis, en este orden: Hipotecario,
 Tarjeta de crédito, Consumo, Vehículo, Educación y Otro. **Consumo** aún no
@@ -1360,9 +1382,9 @@ ui/theme/        # colores y tipografía
     aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
     cada error de validación (la app los muestra tal cual: cualquier cambio en
     los validadores debe mantenerlos).
--   App: 110 pruebas unitarias (`app/src/test`): validaciones, formularios
-    (hipotecario, tarjeta, vehículo), contratos JSON con el backend,
-    repositorios, formatos de moneda y fecha.
+-   App: 126 pruebas unitarias (`app/src/test`): validaciones, formularios
+    (hipotecario, tarjeta, vehículo, educación, otros, ahorro), contratos JSON
+    con el backend, repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
     (instalación vía USB). Cada flujo nuevo se recorre completo hasta
     "Mis deudas".
@@ -1397,6 +1419,12 @@ ui/theme/        # colores y tipografía
     se duerme tras ~15 minutos sin uso y la primera petición tarda ~1 minuto.
     Mientras no exista, el APK apunta a `127.0.0.1` y solo funciona con el
     backend del propio PC.
+-   **Ahorros**: falta el endpoint y el flujo de las otras categorías (cuenta
+    de ahorro, CDT, fondo de inversión, ahorro programado, alcancía), "Agregar
+    aporte" y "Editar" del detalle (la tabla `aportes_meta` hoy cuelga de
+    `metas_ahorro`, no de `ahorros`). **Antes de usar `/ahorros` en el servidor
+    compartido hay que aplicar `db/migraciones/001_ahorros.sql` en Aiven y
+    desplegar de nuevo la API en Render.**
 -   Camino para definir contraseña a usuarios anteriores (ids 9, 10, 12).
 -   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
     el saldo real y los vencimientos).
