@@ -266,6 +266,45 @@ class AporteMeta(Base):
     fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
 
 
+class Ahorro(Base):
+    """Dinero ahorrado por el usuario (flujo "Registrar ahorro"), con una meta opcional."""
+
+    __tablename__ = "ahorros"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    categoria: Mapped[str] = mapped_column(
+        Enum(
+            "CUENTA", "CDT", "FONDO_INVERSION", "PROGRAMADO", "ALCANCIA", "OTRO",
+            name="categoria_ahorro",
+        ),
+        nullable=False,
+    )
+    subtipo: Mapped[str] = mapped_column(String(30), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    monto_actual: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, default=0)
+    moneda: Mapped[str] = mapped_column(String(3), nullable=False, default="COP")
+    es_meta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    meta_nombre: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    monto_objetivo: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
+    fecha_objetivo: Mapped[date | None] = mapped_column(Date, nullable=True)
+    metodo: Mapped[str] = mapped_column(
+        Enum("MANUAL", "PROGRAMADO", "AUTOMATICO", name="metodo_ahorro"),
+        nullable=False,
+        default="MANUAL",
+    )
+    estado: Mapped[str] = mapped_column(
+        Enum("ACTIVA", "CUMPLIDA", "CANCELADA", name="estado_ahorro"),
+        nullable=False,
+        default="ACTIVA",
+    )
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc)
+    fecha_actualizacion: Mapped[datetime] = mapped_column(
+        DateTime, default=ahora_utc, onupdate=ahora_utc
+    )
+
+
 # Tabla de detalle 1:1 por código de tipo de deuda (los tipos que no están aquí
 # guardan todo en la tabla base `deudas`).
 DETALLE_POR_TIPO = {

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from backend.routers import analisis, catalogos, deudas, perfil, usuarios
+from backend.routers import ahorros, analisis, catalogos, deudas, perfil, usuarios
 
 # La estructura de la base se crea con db/schema.sql y db/seed.sql (no con create_all: no
 # genera los CHECK ni los catálogos, y sus tipos de clave no coinciden con los del esquema).
@@ -30,5 +30,6 @@ def health_check():
 app.include_router(usuarios.router)
 app.include_router(catalogos.router)
 app.include_router(deudas.router)
+app.include_router(ahorros.router)
 app.include_router(perfil.router)
 app.include_router(analisis.router)

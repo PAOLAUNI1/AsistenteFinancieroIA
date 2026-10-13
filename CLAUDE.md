@@ -1097,21 +1097,22 @@ backend/
 ├── deps.py            # usuario_actual (lee el token Bearer)
 ├── models.py          # modelos SQLAlchemy (+ DETALLE_POR_TIPO: tabla de detalle de cada tipo)
 ├── tiempo.py          # ahora_utc() para lo guardado y hoy_colombia() para "hoy" (America/Bogota)
-├── routers/           # usuarios, catalogos, deudas, perfil, analisis (solo traducen HTTP)
-├── schemas/           # contratos Pydantic (usuario, deuda, perfil, analisis, catalogo)
-├── services/          # reglas: deudas, repositorio_deudas, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (252 pruebas)
+├── routers/           # usuarios, catalogos, deudas, ahorros, perfil, analisis (solo traducen HTTP)
+├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo)
+├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos
+├── tests/             # pytest (279 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
-├── schema.sql         # estructura de las 14 tablas (generada desde la base real)
-└── seed.sql           # catálogos: tipos de deuda y categorías de gasto
+├── schema.sql         # estructura de las 15 tablas (empieza con DROP TABLE: solo para bases nuevas)
+├── seed.sql           # catálogos: tipos de deuda y categorías de gasto
+└── migraciones/       # cambios para bases que ya tienen datos (idempotentes): 001_ahorros.sql
 Dockerfile, .dockerignore, bd.env.example   # despliegue y configuración
 backend/requirements.txt (versiones fijas, para ejecutar) y requirements-dev.txt (más pytest y httpx)
 ```
 
 ## Base de datos
 
-MySQL, base `asistente_financiero`, 14 tablas: `usuarios`, `deudas`,
+MySQL, base `asistente_financiero`, 15 tablas: `usuarios`, `deudas`, `ahorros`,
 `deuda_tarjeta`, `deuda_vehiculo`, `deuda_educativo`, `deuda_otro`,
 `compras_tarjeta`, `pagos_deuda`, `ingresos`, `gastos`, `categorias_gasto`,
 `metas_ahorro`, `aportes_meta`, `tipos_deuda`.
@@ -1130,6 +1131,13 @@ MySQL, base `asistente_financiero`, 14 tablas: `usuarios`, `deudas`,
     personal; sus endpoints siguen existiendo).
 -   Las credenciales viven en `bd.env` (`DB_HOST`, `DB_PORT`,
     `DB_NAME`, `DB_USER`, `DB_PASSWORD`), que **no se sube a git**.
+-   `ahorros`: dinero ahorrado (categoría `CUENTA`, `CDT`, `FONDO_INVERSION`,
+    `PROGRAMADO`, `ALCANCIA` u `OTRO`; subtipo; monto actual; moneda; meta
+    opcional con nombre, monto y fecha objetivo; método de ahorro; estado). Es
+    distinta de `metas_ahorro`, que guarda la meta anual principal que usa
+    `/analisis`. Hoy solo la categoría `OTRO` tiene endpoint.
+-   **Base que ya tiene datos (p. ej. Aiven):** nunca ejecutar `db/schema.sql`
+    (borra las tablas); aplicar solo `db/migraciones/*.sql` en orden.
 -   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
     restricciones) y luego `db/seed.sql` (catálogos); verificado sobre una
     base vacía: 14 tablas, 8 tipos de deuda y 8 categorías. Si la
@@ -1148,6 +1156,9 @@ MySQL, base `asistente_financiero`, 14 tablas: `usuarios`, `deudas`,
 | GET | `/deudas` | Deudas del usuario |
 | POST | `/deudas/{hipotecario,tarjeta,vehiculo,educativo,libre_inversion,prestamo_personal,consumo,otros}` | Registrar deuda de cada tipo |
 | DELETE | `/deudas/{id}` | Eliminar deuda |
+| GET | `/ahorros` | Ahorros del usuario (con `progreso` de la meta, 0 a 100) |
+| POST | `/ahorros/otro` | Registrar un ahorro de la categoría "Otro tipo de ahorro" |
+| DELETE | `/ahorros/{id}` | Eliminar ahorro |
 | GET/PUT | `/perfil` | Ingresos, gastos y datos familiares |
 | GET/PUT | `/meta-ahorro` | Meta de ahorro |
 | POST | `/analisis` | Resumen financiero (ingresos, gastos, disponible, deuda) |
@@ -1342,7 +1353,7 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 252 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 279 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
