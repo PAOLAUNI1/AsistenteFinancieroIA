@@ -20,6 +20,49 @@ class AhorroNoGuardado(Exception):
     """La base rechazó el ahorro (dato fuera de rango o regla incumplida) y se deshizo el guardado."""
 
 
+def _nombre_requerido(nombre: str, mensaje: str) -> str:
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError(mensaje)
+    return nombre
+
+
+def _exigir_fecha_no_pasada(fecha: date | None) -> None:
+    if fecha is not None and fecha < hoy_colombia():
+        raise ValueError("La fecha objetivo no puede ser anterior a hoy.")
+
+
+def _columnas(
+    *,
+    categoria: str,
+    subtipo: str,
+    nombre: str,
+    descripcion: str | None,
+    monto_actual: float,
+    moneda: str,
+    metodo: str,
+    es_meta: bool = False,
+    meta_nombre: str | None = None,
+    monto_objetivo: float | None = None,
+    fecha_objetivo: date | None = None,
+) -> dict:
+    """Las columnas de `ahorros` de cualquier categoría: lo que cambia es solo qué reglas se aplican."""
+    return {
+        "categoria": categoria,
+        "subtipo": subtipo,
+        "nombre": nombre,
+        "descripcion": (descripcion or "").strip() or None,
+        "monto_actual": monto_actual,
+        "moneda": moneda,
+        "metodo": metodo,
+        "estado": "ACTIVA",
+        "es_meta": es_meta,
+        "meta_nombre": (meta_nombre or "").strip() or None,
+        "monto_objetivo": monto_objetivo,
+        "fecha_objetivo": fecha_objetivo,
+    }
+
+
 def validar_ahorro_otro(
     *,
     subtipo: str,
@@ -33,37 +76,27 @@ def validar_ahorro_otro(
     fecha_objetivo: date | None,
     metodo: str,
 ) -> dict:
-    """Devuelve las columnas de `ahorros` para un ahorro de la categoría OTRO."""
-    nombre = nombre.strip()
-    if not nombre:
-        raise ValueError("Ingresa el nombre del ahorro.")
+    """Columnas de `ahorros` para la categoría OTRO (la meta es opcional)."""
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre del ahorro.")
     if monto_actual < 0:
         raise ValueError("El monto actual no puede ser negativo.")
 
-    meta = {"es_meta": False, "meta_nombre": None, "monto_objetivo": None, "fecha_objetivo": None}
+    meta: dict = {}
     if es_meta:
         if monto_objetivo is None or monto_objetivo <= 0:
             raise ValueError("Ingresa el monto objetivo de la meta.")
-        if fecha_objetivo is not None and fecha_objetivo < hoy_colombia():
-            raise ValueError("La fecha objetivo no puede ser anterior a hoy.")
+        _exigir_fecha_no_pasada(fecha_objetivo)
         meta = {
             "es_meta": True,
-            "meta_nombre": (meta_nombre or "").strip() or None,
+            "meta_nombre": meta_nombre,
             "monto_objetivo": monto_objetivo,
             "fecha_objetivo": fecha_objetivo,
         }
 
-    return {
-        "categoria": "OTRO",
-        "subtipo": subtipo,
-        "nombre": nombre,
-        "descripcion": (descripcion or "").strip() or None,
-        "monto_actual": monto_actual,
-        "moneda": moneda,
-        "metodo": metodo,
-        "estado": "ACTIVA",
-        **meta,
-    }
+    return _columnas(
+        categoria="OTRO", subtipo=subtipo, nombre=nombre, descripcion=descripcion,
+        monto_actual=monto_actual, moneda=moneda, metodo=metodo, **meta,
+    )
 
 
 def validar_ahorro_alcancia(
@@ -77,31 +110,27 @@ def validar_ahorro_alcancia(
     metodo: str,
     aporte_inicial: float,
 ) -> dict:
-    """Devuelve las columnas de `ahorros` para una alcancía (siempre es una meta)."""
-    nombre = nombre.strip()
-    if not nombre:
-        raise ValueError("Ingresa el nombre de la alcancía.")
+    """Columnas de `ahorros` para una alcancía (siempre es una meta; el aporte inicial es el monto actual)."""
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre de la alcancía.")
     if monto_objetivo <= 0:
         raise ValueError("Ingresa el monto objetivo de la alcancía.")
     if aporte_inicial < 0:
         raise ValueError("El aporte inicial no puede ser negativo.")
-    if fecha_objetivo is not None and fecha_objetivo < hoy_colombia():
-        raise ValueError("La fecha objetivo no puede ser anterior a hoy.")
+    _exigir_fecha_no_pasada(fecha_objetivo)
 
-    return {
-        "categoria": "ALCANCIA",
-        "subtipo": subtipo,
-        "nombre": nombre,
-        "descripcion": (descripcion or "").strip() or None,
-        "monto_actual": aporte_inicial,
-        "moneda": moneda,
-        "es_meta": True,
-        "meta_nombre": None,
-        "monto_objetivo": monto_objetivo,
-        "fecha_objetivo": fecha_objetivo,
-        "metodo": metodo,
-        "estado": "ACTIVA",
-    }
+    return _columnas(
+        categoria="ALCANCIA", subtipo=subtipo, nombre=nombre, descripcion=descripcion,
+        monto_actual=aporte_inicial, moneda=moneda, metodo=metodo,
+        es_meta=True, monto_objetivo=monto_objetivo, fecha_objetivo=fecha_objetivo,
+    )
+
+
+# Cómo se valida cada categoría; las llaves son las del segmento de la ruta POST /ahorros/<categoria>
+# y las mismas que `routers/ahorros.ESQUEMAS_POR_CATEGORIA` (que dice qué cuerpo recibe cada una).
+VALIDADORES_POR_CATEGORIA = {
+    "otro": validar_ahorro_otro,
+    "alcancia": validar_ahorro_alcancia,
+}
 
 
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:

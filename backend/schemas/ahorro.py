@@ -1,9 +1,9 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from backend.schemas.deuda import MontoNoNegativo, MontoPositivo
+from backend.schemas.comunes import MontoNoNegativo, MontoPositivo
 
 # Subtipos del flujo "Otro tipo de ahorro" (pantalla 3 del diseño).
 SubtipoOtro = Literal[
@@ -47,6 +47,9 @@ class AhorroAlcanciaIn(BaseModel):
 
 
 class AhorroOut(BaseModel):
+    # Se arma directo desde el modelo SQLAlchemy (los Decimal de MySQL pasan a float).
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     categoria: str
     subtipo: str
@@ -60,31 +63,12 @@ class AhorroOut(BaseModel):
     fecha_objetivo: date | None
     metodo: str
     estado: str
-    # Porcentaje de la meta alcanzado (0 a 100); nulo si el ahorro no tiene meta.
-    progreso: float | None
     fecha_registro: datetime
 
-    @classmethod
-    def desde_modelo(cls, ahorro) -> "AhorroOut":
-        actual = float(ahorro.monto_actual)
-        objetivo = float(ahorro.monto_objetivo) if ahorro.monto_objetivo is not None else None
-        progreso = None
-        if ahorro.es_meta and objetivo:
-            progreso = round(min(actual / objetivo * 100, 100.0), 1)
-        return cls(
-            id=ahorro.id,
-            categoria=ahorro.categoria,
-            subtipo=ahorro.subtipo,
-            nombre=ahorro.nombre,
-            descripcion=ahorro.descripcion,
-            monto_actual=actual,
-            moneda=ahorro.moneda,
-            es_meta=bool(ahorro.es_meta),
-            meta_nombre=ahorro.meta_nombre,
-            monto_objetivo=objetivo,
-            fecha_objetivo=ahorro.fecha_objetivo,
-            metodo=ahorro.metodo,
-            estado=ahorro.estado,
-            progreso=progreso,
-            fecha_registro=ahorro.fecha_registro,
-        )
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def progreso(self) -> float | None:
+        """Porcentaje de la meta alcanzado (0 a 100); nulo si el ahorro no tiene meta."""
+        if not (self.es_meta and self.monto_objetivo):
+            return None
+        return round(min(self.monto_actual / self.monto_objetivo * 100, 100.0), 1)

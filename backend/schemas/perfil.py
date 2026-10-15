@@ -1,10 +1,8 @@
-from typing import Annotated
-
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.schemas.deuda import MAX_MONTO, MontoPositivo
+from backend.schemas.comunes import MontoNoNegativo, MontoPositivo
 
-Monto = Annotated[float, Field(ge=0, le=MAX_MONTO, allow_inf_nan=False)]
+Monto = MontoNoNegativo
 
 
 class PerfilIn(BaseModel):

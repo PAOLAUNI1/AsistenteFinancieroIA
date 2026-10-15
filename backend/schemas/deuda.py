@@ -3,9 +3,10 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
 
-# Límites alineados con las columnas de MySQL (decimal(15,2), decimal(7,4), varchar, ...)
-# para que un dato fuera de rango dé 422 y no un error de base de datos.
-MAX_MONTO = 9_999_999_999_999
+from backend.schemas.comunes import MAX_MONTO, MontoNoNegativo, MontoPositivo  # noqa: F401  (se reexportan)
+
+# Límites alineados con las columnas de MySQL (decimal(7,4), varchar, ...) para que un dato
+# fuera de rango dé 422 y no un error de base de datos. Los montos están en schemas/comunes.py.
 MAX_TASA = 100.0
 MAX_ANOS = 40
 
@@ -15,8 +16,6 @@ def _a_cuatro_decimales(valor: float) -> float:
     return round(valor, 4)
 
 
-MontoPositivo = Annotated[float, Field(gt=0, le=MAX_MONTO, allow_inf_nan=False)]
-MontoNoNegativo = Annotated[float, Field(ge=0, le=MAX_MONTO, allow_inf_nan=False)]
 TasaPositiva = Annotated[
     float, AfterValidator(_a_cuatro_decimales), Field(gt=0, le=MAX_TASA, allow_inf_nan=False)
 ]

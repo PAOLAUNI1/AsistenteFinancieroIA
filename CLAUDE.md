@@ -1098,9 +1098,9 @@ backend/
 ├── models.py          # modelos SQLAlchemy (+ DETALLE_POR_TIPO: tabla de detalle de cada tipo)
 ├── tiempo.py          # ahora_utc() para lo guardado y hoy_colombia() para "hoy" (America/Bogota)
 ├── routers/           # usuarios, catalogos, deudas, ahorros, perfil, analisis (solo traducen HTTP)
-├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo)
-├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (319 pruebas)
+├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo) y comunes (tipos de monto)
+├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos, ip_cliente
+├── tests/             # pytest (325 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 15 tablas (empieza con DROP TABLE: solo para bases nuevas)
@@ -1141,6 +1141,19 @@ MySQL, base `asistente_financiero`, 15 tablas: `usuarios`, `deudas`, `ahorros`,
     "Otro") y su subtipo es el propósito (`META_PERSONALIZADA`,
     `VACACIONES`, `EMERGENCIAS`, `EDUCACION`, `VIVIENDA`, `OTRO`). El método
     `REDONDEO` (ahorrar el cambio de los gastos) solo lo acepta la alcancía.
+-   **Cómo agregar una categoría de ahorro (backend):** un esquema de entrada
+    en `schemas/ahorro.py`, un validador en `services/ahorros.py` (usa
+    `_nombre_requerido`, `_exigir_fecha_no_pasada` y `_columnas`; sus
+    parámetros son los campos del esquema) y una línea en
+    `ESQUEMAS_POR_CATEGORIA` (router) y `VALIDADORES_POR_CATEGORIA`
+    (servicio): el endpoint `POST /ahorros/<categoria>` se genera solo y
+    `test_contrato_ahorros.py` comprueba que esquema y validador coinciden.
+    **Decisión de modelo de datos** (a confirmar con la primera categoría que
+    necesite entidad, tasa, plazo o vencimiento: cuenta, CDT, fondo,
+    programado): lo propio de cada categoría va en una tabla de detalle 1:1
+    (`ahorro_cdt`, ...), como `DETALLE_POR_TIPO` en las deudas, y no en
+    columnas nuevas de `ahorros`, que queda con lo común. Cada método de
+    ahorro nuevo exige un `ALTER ... MODIFY ENUM` (migración).
 -   **Base que ya tiene datos (p. ej. Aiven):** nunca ejecutar `db/schema.sql`
     (borra las tablas); aplicar solo `db/migraciones/*.sql` en orden.
 -   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
@@ -1323,6 +1336,27 @@ El código está en `ui/ahorro/` (`Ahorro.kt` con el formulario y las listas,
 `PasosAhorro.kt`, `ConfirmarAhorroScreen.kt`, `DetalleAhorroScreen.kt`,
 `MisAhorrosScreen.kt` y `RegistroAhorroFlow.kt`).
 
+**Estructura que comparten los flujos de ahorro** (para que una categoría
+nueva no copie código):
+
+-   `ComponentesAhorro.kt`: piezas de presentación comunes
+    (`PasoElegirTipoScreen`, `NombreYDescripcion`, `CampoMoneda`,
+    `OpcionesDeMetodo`, `OpcionAhorro`, `CirculoIcono`).
+-   `CategoriasAhorro.kt`: `CategoriaAhorroUi` por categoría (icono,
+    subtítulos de lista y detalle, textos del detalle, si el detalle abre con
+    el progreso). Las pantallas le preguntan a la categoría, no preguntan
+    "¿es alcancía?"; una categoría que la app no conoce se muestra con lo
+    básico.
+-   `RegistroAhorroFlow.kt`: `FLUJOS_AHORRO` (qué pasos recorre cada
+    categoría y sus textos de carga, error y éxito); se navega por posición
+    dentro de los pasos, con un solo "atrás".
+-   `ui/BorradorFormulario.kt`: formulario de un flujo (estado, editar,
+    reiniciar). El ViewModel tiene un borrador por categoría de ahorro.
+
+Agregar una categoría de ahorro en la app: su formulario y sus pantallas, una
+entrada en `FLUJOS_AHORRO` y en `CATEGORIAS_UI`, un `BorradorFormulario` y un
+`registrarX` en el ViewModel, y un `ControlAhorro` más en `RegistroAhorroFlow`.
+
 La lista de tipos de la app muestra solo seis, en este orden: Hipotecario,
 Tarjeta de crédito, Consumo, Vehículo, Educación y Otro. **Consumo** aún no
 tiene flujo en la app (muestra "Próximamente"); libre inversión y préstamo
@@ -1399,14 +1433,14 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 319 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 325 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
     aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
     cada error de validación (la app los muestra tal cual: cualquier cambio en
     los validadores debe mantenerlos).
--   App: 138 pruebas unitarias (`app/src/test`): validaciones, formularios
+-   App: 144 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo, educación, otros, ahorro, alcancía), contratos JSON
     con el backend, repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
