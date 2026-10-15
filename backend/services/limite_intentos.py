@@ -14,10 +14,20 @@ from collections import deque
 MAX_FALLOS_POR_CORREO = 5
 MAX_FALLOS_POR_IP = 20
 VENTANA_SEGUNDOS = 15 * 60
+# Con más claves guardadas que esto se barren las vencidas (un atacante que rote correos o IP no
+# puede hacer crecer la memoria sin límite).
+MAX_CLAVES = 10_000
 
 
 class LimiteIntentos:
-    def __init__(self, max_por_correo=MAX_FALLOS_POR_CORREO, max_por_ip=MAX_FALLOS_POR_IP, ventana=VENTANA_SEGUNDOS):
+    def __init__(
+        self,
+        max_por_correo=MAX_FALLOS_POR_CORREO,
+        max_por_ip=MAX_FALLOS_POR_IP,
+        ventana=VENTANA_SEGUNDOS,
+        max_claves=MAX_CLAVES,
+    ):
+        self._max_claves = max_claves
         self._max_por_correo = max_por_correo
         self._max_por_ip = max_por_ip
         self._ventana = ventana
@@ -55,6 +65,14 @@ class LimiteIntentos:
             for clave, _ in self._claves(correo, ip):
                 self._recientes(clave, ahora)  # poda los vencidos antes de contar el nuevo
                 self._fallos.setdefault(clave, deque()).append(ahora)
+            if len(self._fallos) > self._max_claves:
+                self._barrer(ahora)
+
+    def _barrer(self, ahora: float) -> None:
+        """Borra las claves cuyo último fallo ya salió de la ventana."""
+        vencidas = [c for c, fallos in self._fallos.items() if not fallos or ahora - fallos[-1] > self._ventana]
+        for clave in vencidas:
+            del self._fallos[clave]
 
     def claves_guardadas(self) -> int:
         """Cuántas claves (correos o IP) tienen fallos guardados; sirve para comprobar que no crece sin motivo."""

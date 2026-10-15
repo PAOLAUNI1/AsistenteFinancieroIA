@@ -14,7 +14,8 @@ services:
         sync: false
       - key: JWT_SECRET          # Render genera un valor aleatorio largo
         generateValue: true
-      # Detrás del proxy de Render la IP real llega en X-Forwarded-For; sin esto el límite de
-      # intentos de login vería la IP del proxy y 20 fallos de cualquiera bloquearían a todos.
-      - key: FORWARDED_ALLOW_IPS
-        value: "*"
+      # Detrás del proxy de Render la IP real llega al final de X-Forwarded-For; sin esto el límite
+      # de intentos de login vería la IP del proxy y 20 fallos de cualquiera bloquearían a todos.
+      # Comprobarlo en el log ("Inicio de sesión fallido desde la IP ...") y ajustar si hay más saltos.
+      - key: PROXY_HOPS
+        value: "1"

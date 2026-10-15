@@ -1,7 +1,8 @@
 -- Migración 001: tabla `ahorros` (flujo "Registrar ahorro" de la app).
 -- Es idempotente: se puede ejecutar sobre una base que ya tiene datos (no borra nada).
 --   mysql -u <usuario> -p <base> < db/migraciones/001_ahorros.sql
--- Una base nueva ya la trae en db/schema.sql.
+-- Una base nueva ya la trae en db/schema.sql. Ya incluye el método REDONDEO; las bases donde se aplicó
+-- una versión anterior de este archivo usan 002_ahorros_metodo_redondeo.sql.
 
 CREATE TABLE IF NOT EXISTS `ahorros` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
@@ -16,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `ahorros` (
   `meta_nombre` varchar(100) DEFAULT NULL,
   `monto_objetivo` decimal(15,2) DEFAULT NULL,
   `fecha_objetivo` date DEFAULT NULL,
-  `metodo` enum('MANUAL','PROGRAMADO','AUTOMATICO') NOT NULL DEFAULT 'MANUAL',
+  `metodo` enum('MANUAL','PROGRAMADO','REDONDEO','AUTOMATICO') NOT NULL DEFAULT 'MANUAL',
   `estado` enum('ACTIVA','CUMPLIDA','CANCELADA') NOT NULL DEFAULT 'ACTIVA',
   `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

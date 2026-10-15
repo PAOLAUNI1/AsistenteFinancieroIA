@@ -1100,7 +1100,7 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, ahorros, perfil, analisis (solo traducen HTTP)
 ├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo)
 ├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (305 pruebas)
+├── tests/             # pytest (319 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 15 tablas (empieza con DROP TABLE: solo para bases nuevas)
@@ -1137,14 +1137,15 @@ MySQL, base `asistente_financiero`, 15 tablas: `usuarios`, `deudas`, `ahorros`,
     distinta de `metas_ahorro`, que guarda la meta anual principal que usa
     `/analisis`. Tienen endpoint las categorías `OTRO` y `ALCANCIA`. La alcancía
     siempre es una meta (monto objetivo obligatorio), su "aporte inicial" es el
-    monto actual y su subtipo es el propósito (`META_PERSONALIZADA`,
+    monto actual y puede superar el objetivo (progreso 100%, igual que en
+    "Otro") y su subtipo es el propósito (`META_PERSONALIZADA`,
     `VACACIONES`, `EMERGENCIAS`, `EDUCACION`, `VIVIENDA`, `OTRO`). El método
     `REDONDEO` (ahorrar el cambio de los gastos) solo lo acepta la alcancía.
 -   **Base que ya tiene datos (p. ej. Aiven):** nunca ejecutar `db/schema.sql`
     (borra las tablas); aplicar solo `db/migraciones/*.sql` en orden.
 -   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
     restricciones) y luego `db/seed.sql` (catálogos); verificado sobre una
-    base vacía: 14 tablas, 8 tipos de deuda y 8 categorías. Si la
+    base vacía: 15 tablas, 8 tipos de deuda y 8 categorías. Si la
     estructura cambia, se regeneran con `mysqldump --no-data` (ver cómo en
     el historial del proyecto) y se actualizan los modelos a mano.
 
@@ -1235,8 +1236,14 @@ Configuración (variables de entorno o `bd.env`, ver `bd.env.example`):
 (`mysql://usuario:clave@host:puerto/base`) en un servidor en la nube;
 `JWT_SECRET` (obligatoria con `APP_ENV=production`, de 32 caracteres o más; el
 Dockerfile ya fija `APP_ENV`); opcionales `JWT_DIAS` y
-`BCRYPT_ROUNDS`. Si la base exige TLS: `DB_SSL_CA_PEM` (contenido del `ca.pem`
-del proveedor), `DB_SSL_CA` (ruta) o `DB_SSL=true` (`backend/database.py`). La URL de Aiven trae `?ssl-mode=REQUIRED`: `database.py` lo quita de la URL (PyMySQL no lo acepta) y lo traduce a TLS. El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
+`BCRYPT_ROUNDS`; `PROXY_HOPS` (cuántos proxies propios hay delante, 0 por
+defecto; en Render 1: el límite de login toma la entrada de `X-Forwarded-For`
+que añade el proxy, contando desde la derecha, porque las anteriores las
+escribe el cliente. Cada fallo de login deja en el log la IP resuelta para
+comprobarlo). Si la base exige TLS: `DB_SSL_CA_PEM` (contenido del `ca.pem`
+del proveedor), `DB_SSL_CA` (ruta) o `DB_SSL=true` (`backend/database.py`). La URL de Aiven trae `?ssl-mode=REQUIRED`: `database.py` lo quita de la URL (PyMySQL no lo acepta) y lo traduce a TLS:
+con `DB_SSL_CA_PEM` se valida la cadena; `REQUIRED` sin certificado cifra sin
+validar al servidor (en producción deja un aviso en el log). El `Dockerfile` arranca con `uvicorn` en el puerto `$PORT`,
 con un usuario sin privilegios y un `HEALTHCHECK` sobre `/health` (no se pudo
 probar localmente: no hay Docker instalado).
 
@@ -1291,7 +1298,7 @@ contraseña incorrectos".
 
 | Pantalla | Contenido |
 |----------|-----------|
-| Registrar ahorro | Seis categorías (cuenta de ahorro, CDT, fondo de inversión, ahorro programado, alcancía y otro). **Solo "Otro" tiene flujo**; las demás muestran "Próximamente" |
+| Registrar ahorro | Seis categorías (cuenta de ahorro, CDT, fondo de inversión, ahorro programado, alcancía y otro). **"Otro" y "Alcancía" tienen flujo**; las otras cuatro muestran "Próximamente" |
 | Otro tipo de ahorro (paso 1) | Ocho subtipos: efectivo, dólares, plan de ahorro, pensión voluntaria, viaje, vivienda, emergencias y personalizado |
 | Registrar otro ahorro (paso 2) | Nombre, descripción (200), monto actual, moneda (COP, USD, EUR) y "¿Es una meta de ahorro?" |
 | Registrar otro ahorro (paso 3) | Si es meta: nombre, monto objetivo y fecha objetivo (opcional); método de ahorro (manual, programado, automático) |
@@ -1392,14 +1399,14 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 305 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 319 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
     aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
     cada error de validación (la app los muestra tal cual: cualquier cambio en
     los validadores debe mantenerlos).
--   App: 137 pruebas unitarias (`app/src/test`): validaciones, formularios
+-   App: 138 pruebas unitarias (`app/src/test`): validaciones, formularios
     (hipotecario, tarjeta, vehículo, educación, otros, ahorro, alcancía), contratos JSON
     con el backend, repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
@@ -1427,7 +1434,7 @@ ui/theme/        # colores y tipografía
     MySQL externa, p. ej. Aiven, porque Render no ofrece MySQL). Preparado en
     el repositorio: tokens, `DATABASE_URL`, TLS opcional hacia la base,
     `JWT_SECRET`, `Dockerfile`, `render.yaml` (Blueprint con
-    `FORWARDED_ALLOW_IPS=*` para que el límite de login use la IP real) y
+    `PROXY_HOPS=1` para que el límite de login use la IP real; ver más abajo) y
     `db/*.sql`. Falta lo que debe hacer una persona con su cuenta: crear la
     MySQL, cargar `db/schema.sql` y `db/seed.sql`, crear el servicio en Render
     con `DATABASE_URL` y `DB_SSL_CA_PEM`, y compilar el APK con
@@ -1437,12 +1444,14 @@ ui/theme/        # colores y tipografía
     Mientras no exista, el APK apunta a `127.0.0.1` y solo funciona con el
     backend del propio PC.
 -   **Ahorros**: falta el endpoint y el flujo de las otras categorías (cuenta
-    de ahorro, CDT, fondo de inversión, ahorro programado, alcancía), "Agregar
+    de ahorro, CDT, fondo de inversión y ahorro programado), "Agregar
     aporte" y "Editar" del detalle (la tabla `aportes_meta` hoy cuelga de
     `metas_ahorro`, no de `ahorros`). **Antes de usar `/ahorros` en el servidor
-    compartido hay que aplicar en Aiven `db/migraciones/001_ahorros.sql` y
-    luego `002_ahorros_metodo_redondeo.sql`, y desplegar de nuevo la API en
-    Render.**
+    compartido hay que aplicar en Aiven `db/migraciones/001_ahorros.sql` (ya
+    incluye el método `REDONDEO`; `002` solo es para bases donde se aplicó
+    una versión anterior de `001`) y desplegar de nuevo la API en Render.**
+    La app tolera un servidor sin `/ahorros`: el Inicio muestra todo menos
+    los ahorros.
 -   Camino para definir contraseña a usuarios anteriores (ids 9, 10, 12).
 -   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
     el saldo real y los vencimientos).

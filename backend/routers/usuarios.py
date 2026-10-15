@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -11,8 +13,11 @@ from backend.services.perfil import (
     autenticar_usuario,
     crear_usuario,
 )
+from backend.services.ip_cliente import ip_del_cliente
 from backend.services.limite_intentos import limite_login
 from backend.services.tokens import crear_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
@@ -43,7 +48,7 @@ def registrar(payload: UsuarioIn, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=SesionOut)
 def iniciar_sesion(payload: LoginIn, request: Request, db: Session = Depends(get_db)):
-    ip = request.client.host if request.client else "desconocida"
+    ip = ip_del_cliente(request)
     espera = limite_login.segundos_de_espera(payload.correo, ip)
     if espera:
         raise HTTPException(
@@ -55,6 +60,7 @@ def iniciar_sesion(payload: LoginIn, request: Request, db: Session = Depends(get
     # Mismo mensaje si el correo no existe o la contraseña es incorrecta.
     if usuario is None:
         limite_login.registrar_fallo(payload.correo, ip)
+        logger.warning("Inicio de sesión fallido desde la IP %s", ip)  # permite comprobar PROXY_HOPS en el log
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos.")
     limite_login.registrar_exito(payload.correo)
     if usuario.estado != "ACTIVO":

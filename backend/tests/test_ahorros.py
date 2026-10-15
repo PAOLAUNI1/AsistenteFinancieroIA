@@ -218,7 +218,6 @@ def test_el_otro_tipo_de_ahorro_no_acepta_el_metodo_redondeo(client, usuario_id)
     "cambios,mensaje",
     [
         ({"nombre": "  "}, "Ingresa el nombre de la alcancía."),
-        ({"aporte_inicial": 4_000_000}, "El aporte inicial no puede superar el monto objetivo."),
         (
             {"fecha_objetivo": (date.today() - timedelta(days=3)).isoformat()},
             "La fecha objetivo no puede ser anterior a hoy.",
@@ -265,3 +264,12 @@ def test_la_alcancia_aparece_en_el_listado_junto_a_los_otros_ahorros(client, usu
     categorias = [a["categoria"] for a in client.get("/ahorros", params={"usuario_id": usuario_id}).json()]
 
     assert sorted(categorias) == ["ALCANCIA", "OTRO"]
+
+
+def test_el_aporte_inicial_puede_superar_el_objetivo_y_el_progreso_queda_en_100(client, usuario_id):
+    # Igual que en "Otro tipo de ahorro": ya tienes más de lo que querías ahorrar.
+    respuesta = _alcancia(client, usuario_id, {**ALCANCIA, "aporte_inicial": 4_000_000})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["monto_actual"] == 4_000_000
+    assert respuesta.json()["progreso"] == 100.0

@@ -123,7 +123,10 @@ def test_con_el_certificado_en_una_variable_se_valida_la_cadena(monkeypatch):
 
 def test_el_certificado_con_saltos_de_linea_literales_tambien_se_acepta(monkeypatch):
     _sin_variables_tls(monkeypatch)
-    monkeypatch.setenv("DB_SSL_CA_PEM", _certificado_de_prueba().strip().replace("\n", "\n"))
+    # Al pegar el certificado en el panel de Render los saltos de línea pueden llegar como "\n" literal.
+    con_literales = _certificado_de_prueba().strip().replace("\n", "\\n")
+    assert "\n" not in con_literales
+    monkeypatch.setenv("DB_SSL_CA_PEM", con_literales)
 
     assert "ssl" in database._argumentos_de_conexion()
 
@@ -195,3 +198,44 @@ def test_el_motor_se_crea_con_la_url_de_aiven_sin_el_parametro_que_rompia(monkey
     motor = create_engine(url, connect_args=database._argumentos_de_conexion(modo))
 
     assert "ssl-mode" not in str(motor.url)
+
+
+def test_verify_ca_sin_certificado_valida_la_cadena_pero_no_el_nombre(monkeypatch):
+    import ssl
+
+    _sin_variables_tls(monkeypatch)
+
+    contexto = database._argumentos_de_conexion("VERIFY_CA")["ssl"]
+
+    assert contexto.verify_mode == ssl.CERT_REQUIRED
+    assert contexto.check_hostname is False
+
+
+def test_verify_identity_valida_tambien_el_nombre(monkeypatch):
+    _sin_variables_tls(monkeypatch)
+
+    assert database._argumentos_de_conexion("VERIFY_IDENTITY")["ssl"].check_hostname is True
+
+
+def test_en_produccion_cifrar_sin_validar_deja_un_aviso(monkeypatch, caplog):
+    import logging
+
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+
+    with caplog.at_level(logging.WARNING, logger=database.logger.name):
+        database._argumentos_de_conexion("REQUIRED")
+
+    assert "sin validar el servidor" in caplog.text
+
+
+def test_fuera_de_produccion_cifrar_sin_validar_no_avisa(monkeypatch, caplog):
+    import logging
+
+    _sin_variables_tls(monkeypatch)
+    monkeypatch.delenv("APP_ENV", raising=False)
+
+    with caplog.at_level(logging.WARNING, logger=database.logger.name):
+        database._argumentos_de_conexion("REQUIRED")
+
+    assert "sin validar el servidor" not in caplog.text

@@ -1,4 +1,7 @@
 -- Esquema de la base `asistente_financiero` (MySQL 8).
+-- ATENCIÓN: este archivo empieza cada tabla con DROP TABLE IF EXISTS. Ejecutarlo sobre una base que
+-- ya tiene datos (p. ej. la de Aiven) BORRA todo. Para una base con datos usa solo db/migraciones/*.sql.
+--
 -- Generado desde la base de desarrollo. Se ejecuta sobre una base vacía ya creada:
 --   mysql -u <usuario> -p <base> < db/schema.sql
 -- Después se cargan los catálogos con db/seed.sql.

@@ -85,8 +85,6 @@ def validar_ahorro_alcancia(
         raise ValueError("Ingresa el monto objetivo de la alcancía.")
     if aporte_inicial < 0:
         raise ValueError("El aporte inicial no puede ser negativo.")
-    if aporte_inicial > monto_objetivo:
-        raise ValueError("El aporte inicial no puede superar el monto objetivo.")
     if fecha_objetivo is not None and fecha_objetivo < hoy_colombia():
         raise ValueError("La fecha objetivo no puede ser anterior a hoy.")
 

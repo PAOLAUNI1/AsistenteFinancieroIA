@@ -43,3 +43,30 @@ def test_bloquea_por_ip_aunque_cambie_el_correo():
 
     assert limite.segundos_de_espera("otro@example.com", "9.9.9.9") > 0
     assert limite.segundos_de_espera("otro@example.com", "8.8.8.8") == 0
+
+
+def test_con_demasiadas_claves_se_barren_las_vencidas(monkeypatch):
+    reloj = [1000.0]
+    monkeypatch.setattr("backend.services.limite_intentos.time.monotonic", lambda: reloj[0])
+    limite = LimiteIntentos(max_por_correo=5, max_por_ip=50, ventana=60, max_claves=10)
+    # Un atacante rota correos e IP: cada uno falla una sola vez y no vuelve a aparecer.
+    for i in range(20):
+        limite.registrar_fallo(f"x{i}@example.com", f"10.0.0.{i}")
+    assert limite.claves_guardadas() > 10
+
+    reloj[0] += 61
+    limite.registrar_fallo("nuevo@example.com", "10.9.9.9")
+
+    assert limite.claves_guardadas() == 2  # solo lo recién registrado: correo y IP
+
+
+def test_el_barrido_no_borra_los_fallos_vigentes(monkeypatch):
+    reloj = [1000.0]
+    monkeypatch.setattr("backend.services.limite_intentos.time.monotonic", lambda: reloj[0])
+    limite = LimiteIntentos(max_por_correo=2, max_por_ip=50, ventana=60, max_claves=4)
+    limite.registrar_fallo("a@example.com", "1.1.1.1")
+    limite.registrar_fallo("a@example.com", "1.1.1.1")
+    for i in range(6):
+        limite.registrar_fallo(f"b{i}@example.com", f"2.2.2.{i}")  # fuerzan barridos, aún vigentes
+
+    assert limite.segundos_de_espera("a@example.com", "9.9.9.9") > 0

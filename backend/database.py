@@ -1,3 +1,4 @@
+import logging
 import os
 import ssl
 from pathlib import Path
@@ -7,6 +8,8 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+logger = logging.getLogger(__name__)
 
 load_dotenv(Path(__file__).resolve().parent.parent / "bd.env")
 
@@ -75,25 +78,36 @@ def _contexto_tls(modo_de_la_url: str | None = None) -> ssl.SSLContext | None:
     """
     pem = os.getenv("DB_SSL_CA_PEM", "").strip()
     ruta = os.getenv("DB_SSL_CA", "").strip()
+    db_ssl = os.getenv("DB_SSL", "").strip().lower() in ("1", "true", "si", "sí")
     if modo_de_la_url in ("DISABLED", "FALSE", "0"):
         return None
+
     if pem:
         # Al pegar el certificado en una variable de entorno los saltos de línea pueden llegar como "\n" literal.
         contexto = ssl.create_default_context(cadata=pem.replace("\\n", "\n"))
     elif ruta:
         contexto = ssl.create_default_context(cafile=ruta)
-    elif os.getenv("DB_SSL", "").strip().lower() in ("1", "true", "si", "sí") or modo_de_la_url in (
-        "VERIFY_CA",
-        "VERIFY_IDENTITY",
-    ):
-        return ssl.create_default_context()
+    elif db_ssl or modo_de_la_url in ("VERIFY_CA", "VERIFY_IDENTITY"):
+        contexto = ssl.create_default_context()  # autoridades del sistema
     elif modo_de_la_url is not None:  # REQUIRED, PREFERRED, TRUE...: cifrado sin validar el certificado
         contexto = ssl.create_default_context()
         contexto.check_hostname = False  # Python exige apagarlo antes de poner CERT_NONE
         contexto.verify_mode = ssl.CERT_NONE
+        if os.getenv("APP_ENV") == "production":
+            logger.warning(
+                "La conexión a MySQL va cifrada pero sin validar el servidor: define DB_SSL_CA_PEM "
+                "(o DB_SSL_CA) con el certificado del proveedor."
+            )
+        return contexto
     else:
         return None
-    contexto.check_hostname = modo_de_la_url == "VERIFY_IDENTITY"
+
+    # La cadena siempre se valida; el nombre del servidor solo con VERIFY_IDENTITY o con DB_SSL=true
+    # y las autoridades del sistema (VERIFY_CA, como indica Aiven, no lo comprueba).
+    valida_nombre = modo_de_la_url == "VERIFY_IDENTITY" or (
+        modo_de_la_url is None and db_ssl and not (pem or ruta)
+    )
+    contexto.check_hostname = valida_nombre
     return contexto
 
 
