@@ -66,6 +66,46 @@ def validar_ahorro_otro(
     }
 
 
+def validar_ahorro_alcancia(
+    *,
+    subtipo: str,
+    nombre: str,
+    descripcion: str | None,
+    monto_objetivo: float,
+    moneda: str,
+    fecha_objetivo: date | None,
+    metodo: str,
+    aporte_inicial: float,
+) -> dict:
+    """Devuelve las columnas de `ahorros` para una alcancía (siempre es una meta)."""
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError("Ingresa el nombre de la alcancía.")
+    if monto_objetivo <= 0:
+        raise ValueError("Ingresa el monto objetivo de la alcancía.")
+    if aporte_inicial < 0:
+        raise ValueError("El aporte inicial no puede ser negativo.")
+    if aporte_inicial > monto_objetivo:
+        raise ValueError("El aporte inicial no puede superar el monto objetivo.")
+    if fecha_objetivo is not None and fecha_objetivo < hoy_colombia():
+        raise ValueError("La fecha objetivo no puede ser anterior a hoy.")
+
+    return {
+        "categoria": "ALCANCIA",
+        "subtipo": subtipo,
+        "nombre": nombre,
+        "descripcion": (descripcion or "").strip() or None,
+        "monto_actual": aporte_inicial,
+        "moneda": moneda,
+        "es_meta": True,
+        "meta_nombre": None,
+        "monto_objetivo": monto_objetivo,
+        "fecha_objetivo": fecha_objetivo,
+        "metodo": metodo,
+        "estado": "ACTIVA",
+    }
+
+
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:
     ahorro = Ahorro(usuario_id=usuario_id, **columnas)
     try:

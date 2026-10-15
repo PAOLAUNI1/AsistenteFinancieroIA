@@ -9,8 +9,14 @@ from backend.schemas.deuda import MontoNoNegativo, MontoPositivo
 SubtipoOtro = Literal[
     "EFECTIVO", "DOLARES", "PLAN", "PENSION", "VIAJE", "VIVIENDA", "EMERGENCIAS", "PERSONALIZADO"
 ]
+# Subtipos de alcancía: el propósito que se le da (pantalla 3 del diseño de alcancía).
+SubtipoAlcancia = Literal[
+    "META_PERSONALIZADA", "VACACIONES", "EMERGENCIAS", "EDUCACION", "VIVIENDA", "OTRO"
+]
 Moneda = Literal["COP", "USD", "EUR"]
 MetodoAhorro = Literal["MANUAL", "PROGRAMADO", "AUTOMATICO"]
+# La alcancía admite además ahorrar el cambio de los gastos.
+MetodoAlcancia = Literal["MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO"]
 
 
 class AhorroOtroIn(BaseModel):
@@ -25,6 +31,19 @@ class AhorroOtroIn(BaseModel):
     monto_objetivo: MontoPositivo | None = None
     fecha_objetivo: date | None = None
     metodo: MetodoAhorro = "MANUAL"
+
+
+class AhorroAlcanciaIn(BaseModel):
+    subtipo: SubtipoAlcancia
+    nombre: str = Field(max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    # Una alcancía siempre tiene meta: el monto objetivo es obligatorio.
+    monto_objetivo: MontoPositivo
+    moneda: Moneda = "COP"
+    fecha_objetivo: date | None = None
+    metodo: MetodoAlcancia = "MANUAL"
+    # Con cuánto se abre la alcancía (será el monto actual).
+    aporte_inicial: MontoNoNegativo = 0.0
 
 
 class AhorroOut(BaseModel):

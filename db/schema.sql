@@ -29,7 +29,7 @@ CREATE TABLE `ahorros` (
   `meta_nombre` varchar(100) DEFAULT NULL,
   `monto_objetivo` decimal(15,2) DEFAULT NULL,
   `fecha_objetivo` date DEFAULT NULL,
-  `metodo` enum('MANUAL','PROGRAMADO','AUTOMATICO') NOT NULL DEFAULT 'MANUAL',
+  `metodo` enum('MANUAL','PROGRAMADO','REDONDEO','AUTOMATICO') NOT NULL DEFAULT 'MANUAL',
   `estado` enum('ACTIVA','CUMPLIDA','CANCELADA') NOT NULL DEFAULT 'ACTIVA',
   `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

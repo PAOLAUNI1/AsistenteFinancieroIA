@@ -290,7 +290,7 @@ class Ahorro(Base):
     monto_objetivo: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     fecha_objetivo: Mapped[date | None] = mapped_column(Date, nullable=True)
     metodo: Mapped[str] = mapped_column(
-        Enum("MANUAL", "PROGRAMADO", "AUTOMATICO", name="metodo_ahorro"),
+        Enum("MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO", name="metodo_ahorro"),
         nullable=False,
         default="MANUAL",
     )
