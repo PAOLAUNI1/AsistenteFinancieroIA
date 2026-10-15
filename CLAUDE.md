@@ -1100,12 +1100,12 @@ backend/
 ├── routers/           # usuarios, catalogos, deudas, ahorros, perfil, analisis (solo traducen HTTP)
 ├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo)
 ├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos
-├── tests/             # pytest (279 pruebas)
+├── tests/             # pytest (305 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json
 db/
 ├── schema.sql         # estructura de las 15 tablas (empieza con DROP TABLE: solo para bases nuevas)
 ├── seed.sql           # catálogos: tipos de deuda y categorías de gasto
-└── migraciones/       # cambios para bases que ya tienen datos (idempotentes): 001_ahorros.sql
+└── migraciones/       # cambios para bases que ya tienen datos (idempotentes): 001_ahorros.sql, 002_ahorros_metodo_redondeo.sql
 Dockerfile, .dockerignore, bd.env.example   # despliegue y configuración
 backend/requirements.txt (versiones fijas, para ejecutar) y requirements-dev.txt (más pytest y httpx)
 ```
@@ -1135,7 +1135,11 @@ MySQL, base `asistente_financiero`, 15 tablas: `usuarios`, `deudas`, `ahorros`,
     `PROGRAMADO`, `ALCANCIA` u `OTRO`; subtipo; monto actual; moneda; meta
     opcional con nombre, monto y fecha objetivo; método de ahorro; estado). Es
     distinta de `metas_ahorro`, que guarda la meta anual principal que usa
-    `/analisis`. Hoy solo la categoría `OTRO` tiene endpoint.
+    `/analisis`. Tienen endpoint las categorías `OTRO` y `ALCANCIA`. La alcancía
+    siempre es una meta (monto objetivo obligatorio), su "aporte inicial" es el
+    monto actual y su subtipo es el propósito (`META_PERSONALIZADA`,
+    `VACACIONES`, `EMERGENCIAS`, `EDUCACION`, `VIVIENDA`, `OTRO`). El método
+    `REDONDEO` (ahorrar el cambio de los gastos) solo lo acepta la alcancía.
 -   **Base que ya tiene datos (p. ej. Aiven):** nunca ejecutar `db/schema.sql`
     (borra las tablas); aplicar solo `db/migraciones/*.sql` en orden.
 -   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
@@ -1158,6 +1162,7 @@ MySQL, base `asistente_financiero`, 15 tablas: `usuarios`, `deudas`, `ahorros`,
 | DELETE | `/deudas/{id}` | Eliminar deuda |
 | GET | `/ahorros` | Ahorros del usuario (con `progreso` de la meta, 0 a 100) |
 | POST | `/ahorros/otro` | Registrar un ahorro de la categoría "Otro tipo de ahorro" |
+| POST | `/ahorros/alcancia` | Registrar una alcancía (meta con monto objetivo y aporte inicial opcional) |
 | DELETE | `/ahorros/{id}` | Eliminar ahorro |
 | GET/PUT | `/perfil` | Ingresos, gastos y datos familiares |
 | GET/PUT | `/meta-ahorro` | Meta de ahorro |
@@ -1293,6 +1298,18 @@ contraseña incorrectos".
 | Confirmar → Guardando → Éxito | Resumen, "Guardar", "Ver mis ahorros" / "Volver al inicio" |
 | Detalle del ahorro | Monto, meta, progreso (%), fecha objetivo, método y descripción. "Agregar aporte" y "Editar" muestran "Próximamente" |
 
+### Registrar alcancía
+
+Mismo punto de entrada ("Registrar ahorro" -> "Alcancía"): propósito (meta
+personalizada, vacaciones, emergencias, educación, vivienda u otro) -> nombre,
+descripción, monto objetivo (obligatorio), moneda y fecha objetivo (opcional)
+-> método (manual, programado, **redondeo** o automático) y aporte inicial
+(opcional, no puede superar el objetivo) -> confirmar -> guardado -> éxito. El
+detalle muestra el progreso, el monto objetivo, el actual y el **saldo
+faltante**; en las listas aparece como "Alcancía" con el icono de la alcancía.
+El código está en `ui/ahorro/Alcancia.kt`, `PasosAlcancia.kt` y
+`ConfirmarAlcanciaScreen.kt`; el flujo comparte `RegistroAhorroFlow`.
+
 Si no se marca "es una meta", el paso 3 solo muestra el método y no se envía
 nada de la meta. La fecha objetivo es opcional (el backend la acepta nula).
 El código está en `ui/ahorro/` (`Ahorro.kt` con el formulario y las listas,
@@ -1375,15 +1392,15 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 279 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 305 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
     aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
     cada error de validación (la app los muestra tal cual: cualquier cambio en
     los validadores debe mantenerlos).
--   App: 126 pruebas unitarias (`app/src/test`): validaciones, formularios
-    (hipotecario, tarjeta, vehículo, educación, otros, ahorro), contratos JSON
+-   App: 137 pruebas unitarias (`app/src/test`): validaciones, formularios
+    (hipotecario, tarjeta, vehículo, educación, otros, ahorro, alcancía), contratos JSON
     con el backend, repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
     (instalación vía USB). Cada flujo nuevo se recorre completo hasta
@@ -1423,8 +1440,9 @@ ui/theme/        # colores y tipografía
     de ahorro, CDT, fondo de inversión, ahorro programado, alcancía), "Agregar
     aporte" y "Editar" del detalle (la tabla `aportes_meta` hoy cuelga de
     `metas_ahorro`, no de `ahorros`). **Antes de usar `/ahorros` en el servidor
-    compartido hay que aplicar `db/migraciones/001_ahorros.sql` en Aiven y
-    desplegar de nuevo la API en Render.**
+    compartido hay que aplicar en Aiven `db/migraciones/001_ahorros.sql` y
+    luego `002_ahorros_metodo_redondeo.sql`, y desplegar de nuevo la API en
+    Render.**
 -   Camino para definir contraseña a usuarios anteriores (ids 9, 10, 12).
 -   Registro de pagos y movimientos (alimenta el pago mínimo de tarjetas,
     el saldo real y los vencimientos).
