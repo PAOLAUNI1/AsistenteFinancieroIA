@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from backend.schemas.comunes import MontoNoNegativo, MontoPositivo, TasaNoNegativa
+from backend.schemas.comunes import MontoNoNegativo, MontoPositivo, TasaNoNegativa, TasaPositiva
 
 # Subtipos del flujo "Otro tipo de ahorro" (pantalla 3 del diseño).
 SubtipoOtro = Literal[
@@ -26,6 +26,9 @@ PeriodicidadAhorro = Literal["SEMANAL", "QUINCENAL", "MENSUAL"]
 SubtipoFondo = Literal["RENTA_FIJA", "RENTA_VARIABLE", "MIXTO", "OTRO"]
 PlazoFondo = Literal["CORTO", "MEDIANO", "LARGO"]
 TipoRentabilidad = Literal["FIJA", "VARIABLE"]
+# CDT: el tipo de tasa es el subtipo del ahorro; las instrucciones dicen qué se renueva al vencer.
+TipoTasaCdt = Literal["FIJA", "VARIABLE"]
+InstruccionRenovacion = Literal["MISMO_MONTO", "CAPITAL_E_INTERESES", "SOLO_CAPITAL"]
 
 
 class AhorroOtroIn(BaseModel):
@@ -87,6 +90,24 @@ class AhorroFondoIn(BaseModel):
     reinversion: bool = False
 
 
+class AhorroCdtIn(BaseModel):
+    tipo_tasa: TipoTasaCdt = "FIJA"
+    entidad: str = Field(max_length=100)
+    nombre: str = Field(max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    # Lo invertido en el CDT (será el monto actual).
+    monto: MontoPositivo
+    moneda: Moneda = "COP"
+    # Tasa de interés anual (porcentaje).
+    tasa_interes: TasaPositiva
+    plazo_meses: int = Field(ge=1, le=600)
+    fecha_apertura: date
+    fecha_vencimiento: date
+    renovacion_automatica: bool = False
+    # Solo se guarda si la renovación es automática; sin indicarla, se renueva con el mismo monto.
+    instruccion_renovacion: InstruccionRenovacion | None = None
+
+
 class AhorroOut(BaseModel):
     # Se arma directo desde el modelo SQLAlchemy (los Decimal de MySQL pasan a float).
     model_config = ConfigDict(from_attributes=True)
@@ -116,6 +137,13 @@ class AhorroOut(BaseModel):
     reinversion: bool | None = None
     plazo_sugerido: str | None = None
     fecha_inversion: date | None = None
+    # Solo en los CDT.
+    tasa_interes: float | None = None
+    plazo_meses: int | None = None
+    fecha_apertura: date | None = None
+    fecha_vencimiento: date | None = None
+    renovacion_automatica: bool | None = None
+    instruccion_renovacion: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -592,3 +592,186 @@ def test_eliminar_un_fondo_borra_tambien_su_detalle(client, usuario_id):
     assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
 
     assert detalles() == 0
+
+
+# ---------------------------------------------------------------------- CDT
+
+CDT = {
+    "tipo_tasa": "FIJA",
+    "entidad": "Bancolombia",
+    "nombre": "CDT Ahorro Viaje",
+    "descripcion": "CDT para ahorro del viaje familiar.",
+    "monto": 5_000_000,
+    "moneda": "COP",
+    "tasa_interes": 11.5,
+    "plazo_meses": 12,
+    "fecha_apertura": "2026-11-01",
+    "fecha_vencimiento": "2027-11-01",
+    "renovacion_automatica": True,
+    "instruccion_renovacion": "MISMO_MONTO",
+}
+
+
+def _cdt(client, usuario_id, cuerpo):
+    return client.post("/ahorros/cdt", params={"usuario_id": usuario_id}, json=cuerpo)
+
+
+def test_un_cdt_se_registra_con_su_detalle_y_sin_meta(client, usuario_id):
+    respuesta = _cdt(client, usuario_id, CDT)
+
+    assert respuesta.status_code == 201, respuesta.text
+    ahorro = respuesta.json()
+    assert ahorro["categoria"] == "CDT"
+    assert ahorro["subtipo"] == "FIJA"  # el tipo de tasa es el subtipo
+    assert ahorro["nombre"] == "CDT Ahorro Viaje"
+    assert ahorro["monto_actual"] == 5_000_000
+    assert ahorro["moneda"] == "COP"
+    assert ahorro["estado"] == "ACTIVA"
+    assert ahorro["es_meta"] is False
+    assert ahorro["progreso"] is None
+    assert ahorro["entidad"] == "Bancolombia"
+    assert ahorro["tasa_interes"] == 11.5
+    assert ahorro["plazo_meses"] == 12
+    assert ahorro["fecha_apertura"] == "2026-11-01"
+    assert ahorro["fecha_vencimiento"] == "2027-11-01"
+    assert ahorro["renovacion_automatica"] is True
+    assert ahorro["instruccion_renovacion"] == "MISMO_MONTO"
+
+
+def test_el_detalle_del_cdt_vuelve_en_el_listado_y_no_en_las_otras_categorias(client, usuario_id):
+    _cdt(client, usuario_id, CDT)
+    _registrar(client, usuario_id, BASICO)
+
+    por_categoria = {
+        a["categoria"]: a for a in client.get("/ahorros", params={"usuario_id": usuario_id}).json()
+    }
+
+    assert por_categoria["CDT"]["tasa_interes"] == 11.5
+    assert por_categoria["CDT"]["fecha_vencimiento"] == "2027-11-01"
+    for campo in ("entidad", "tasa_interes", "plazo_meses", "fecha_apertura", "fecha_vencimiento",
+                  "renovacion_automatica", "instruccion_renovacion"):
+        assert por_categoria["OTRO"][campo] is None
+
+
+def test_la_entidad_se_ve_igual_en_un_fondo_y_en_un_cdt(client, usuario_id):
+    _fondo(client, usuario_id, FONDO)
+    _cdt(client, usuario_id, CDT)
+
+    ahorros = client.get("/ahorros", params={"usuario_id": usuario_id}).json()
+
+    assert sorted(a["entidad"] for a in ahorros) == ["Bancolombia", "Bancolombia"]
+    # Cada categoría trae solo lo suyo.
+    por_categoria = {a["categoria"]: a for a in ahorros}
+    assert por_categoria["CDT"]["tasa_rendimiento"] is None
+    assert por_categoria["FONDO_INVERSION"]["tasa_interes"] is None
+
+
+def test_sin_renovacion_automatica_las_instrucciones_no_se_guardan(client, usuario_id):
+    ahorro = _cdt(client, usuario_id, {**CDT, "renovacion_automatica": False}).json()
+
+    assert ahorro["renovacion_automatica"] is False
+    assert ahorro["instruccion_renovacion"] is None
+
+
+def test_con_renovacion_automatica_y_sin_instrucciones_se_renueva_con_el_mismo_monto(client, usuario_id):
+    cuerpo = {k: v for k, v in CDT.items() if k != "instruccion_renovacion"}
+
+    ahorro = _cdt(client, usuario_id, cuerpo).json()
+
+    assert ahorro["instruccion_renovacion"] == "MISMO_MONTO"
+
+
+@pytest.mark.parametrize("instruccion", ["MISMO_MONTO", "CAPITAL_E_INTERESES", "SOLO_CAPITAL"])
+def test_se_aceptan_las_tres_instrucciones_de_renovacion(client, usuario_id, instruccion):
+    respuesta = _cdt(client, usuario_id, {**CDT, "instruccion_renovacion": instruccion})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["instruccion_renovacion"] == instruccion
+
+
+@pytest.mark.parametrize("tipo_tasa", ["FIJA", "VARIABLE"])
+def test_se_aceptan_los_dos_tipos_de_tasa(client, usuario_id, tipo_tasa):
+    respuesta = _cdt(client, usuario_id, {**CDT, "tipo_tasa": tipo_tasa})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["subtipo"] == tipo_tasa
+
+
+def test_el_tipo_de_tasa_es_fija_por_defecto_y_la_fecha_de_apertura_puede_ser_futura_o_pasada(client, usuario_id):
+    sin_tipo = {k: v for k, v in CDT.items() if k != "tipo_tasa"}
+
+    assert _cdt(client, usuario_id, sin_tipo).json()["subtipo"] == "FIJA"
+    assert _cdt(client, usuario_id, {**CDT, "fecha_apertura": "2020-01-01", "fecha_vencimiento": "2021-01-01"}).status_code == 201
+
+
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"entidad": "  "}, "Selecciona la entidad financiera."),
+        ({"nombre": "  "}, "Ingresa el nombre del CDT."),
+        (
+            {"fecha_apertura": "2026-11-01", "fecha_vencimiento": "2026-11-01"},
+            "La fecha de vencimiento debe ser posterior a la fecha de apertura.",
+        ),
+        (
+            {"fecha_apertura": "2026-11-01", "fecha_vencimiento": "2026-10-01"},
+            "La fecha de vencimiento debe ser posterior a la fecha de apertura.",
+        ),
+    ],
+)
+def test_las_reglas_del_cdt_dan_422_con_su_mensaje(client, usuario_id, cambios, mensaje):
+    respuesta = _cdt(client, usuario_id, {**CDT, **cambios})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["detail"] == mensaje
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"tipo_tasa": "MIXTA"},
+        {"monto": 0},
+        {"monto": -1},
+        {"tasa_interes": 0},
+        {"tasa_interes": 100.5},
+        {"plazo_meses": 0},
+        {"plazo_meses": 601},
+        {"plazo_meses": 12.5},
+        {"instruccion_renovacion": "REDIMIR"},
+        {"moneda": "XXX"},
+        {"entidad": "x" * 101},
+        {"nombre": "x" * 101},
+        {"descripcion": "x" * 201},
+        {"fecha_apertura": "no es fecha"},
+    ],
+)
+def test_datos_fuera_de_rango_del_cdt_dan_422(client, usuario_id, cambios):
+    assert _cdt(client, usuario_id, {**CDT, **cambios}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "campo", ["entidad", "nombre", "monto", "tasa_interes", "plazo_meses", "fecha_apertura", "fecha_vencimiento"]
+)
+def test_los_campos_obligatorios_del_cdt(client, usuario_id, campo):
+    cuerpo = {k: v for k, v in CDT.items() if k != campo}
+
+    assert _cdt(client, usuario_id, cuerpo).status_code == 422
+
+
+def test_registrar_un_cdt_sin_token_responde_401(client):
+    assert client.post("/ahorros/cdt", json=CDT).status_code == 401
+
+
+def test_eliminar_un_cdt_borra_tambien_su_detalle(client, usuario_id):
+    from backend.models import AhorroCdt
+
+    def detalles():
+        with client.session_factory() as db:
+            return db.query(AhorroCdt).count()
+
+    id_ahorro = _cdt(client, usuario_id, CDT).json()["id"]
+    assert detalles() == 1
+
+    assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
+
+    assert detalles() == 0

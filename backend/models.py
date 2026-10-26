@@ -315,6 +315,10 @@ class Ahorro(Base):
     fondo: Mapped["AhorroFondo | None"] = relationship(
         lazy="joined", uselist=False, cascade="all, delete-orphan"
     )
+    # Detalle 1:1 de la categoría CDT.
+    cdt: Mapped["AhorroCdt | None"] = relationship(
+        lazy="joined", uselist=False, cascade="all, delete-orphan"
+    )
 
     # Lo propio del ahorro programado, expuesto como atributos del ahorro (AhorroOut lo lee directo).
     @property
@@ -329,10 +333,11 @@ class Ahorro(Base):
     def fecha_inicio(self) -> date | None:
         return self.programado.fecha_inicio if self.programado else None
 
-    # Lo propio del fondo de inversión, igual que lo del ahorro programado.
+    # Lo propio del fondo de inversión y del CDT, igual que lo del ahorro programado.
     @property
     def entidad(self) -> str | None:
-        return self.fondo.entidad if self.fondo else None
+        detalle = self.fondo or self.cdt
+        return detalle.entidad if detalle else None
 
     @property
     def tasa_rendimiento(self) -> float | None:
@@ -354,6 +359,30 @@ class Ahorro(Base):
     def fecha_inversion(self) -> date | None:
         return self.fondo.fecha_inversion if self.fondo else None
 
+    @property
+    def tasa_interes(self) -> float | None:
+        return self.cdt.tasa_interes if self.cdt else None
+
+    @property
+    def plazo_meses(self) -> int | None:
+        return self.cdt.plazo_meses if self.cdt else None
+
+    @property
+    def fecha_apertura(self) -> date | None:
+        return self.cdt.fecha_apertura if self.cdt else None
+
+    @property
+    def fecha_vencimiento(self) -> date | None:
+        return self.cdt.fecha_vencimiento if self.cdt else None
+
+    @property
+    def renovacion_automatica(self) -> bool | None:
+        return self.cdt.renovacion_automatica if self.cdt else None
+
+    @property
+    def instruccion_renovacion(self) -> str | None:
+        return self.cdt.instruccion_renovacion if self.cdt else None
+
 
 class AhorroProgramado(Base):
     """Detalle 1:1 para ahorros de categoría PROGRAMADO: cuánto se ahorra, cada cuánto y desde cuándo."""
@@ -371,6 +400,28 @@ class AhorroProgramado(Base):
         Enum("SEMANAL", "QUINCENAL", "MENSUAL", name="periodicidad_ahorro"), nullable=False
     )
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class AhorroCdt(Base):
+    """Detalle 1:1 para ahorros de categoría CDT (el tipo de tasa, fija o variable, es el subtipo del ahorro)."""
+
+    __tablename__ = "ahorro_cdt"
+
+    ahorro_id: Mapped[int] = mapped_column(
+        Integer().with_variant(mysql.INTEGER(unsigned=True), "mysql"),
+        ForeignKey("ahorros.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    entidad: Mapped[str] = mapped_column(String(100), nullable=False)
+    tasa_interes: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False)
+    plazo_meses: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    fecha_apertura: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_vencimiento: Mapped[date] = mapped_column(Date, nullable=False)
+    renovacion_automatica: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    instruccion_renovacion: Mapped[str | None] = mapped_column(
+        Enum("MISMO_MONTO", "CAPITAL_E_INTERESES", "SOLO_CAPITAL", name="instruccion_renovacion"),
+        nullable=True,
+    )
 
 
 class AhorroFondo(Base):

@@ -10,7 +10,7 @@ from datetime import date
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.models import Ahorro, AhorroFondo, AhorroProgramado
+from backend.models import Ahorro, AhorroCdt, AhorroFondo, AhorroProgramado
 from backend.tiempo import hoy_colombia
 
 logger = logging.getLogger(__name__)
@@ -205,6 +205,46 @@ def validar_ahorro_fondo(
     return columnas
 
 
+def validar_ahorro_cdt(
+    *,
+    tipo_tasa: str,
+    entidad: str,
+    nombre: str,
+    descripcion: str | None,
+    monto: float,
+    moneda: str,
+    tasa_interes: float,
+    plazo_meses: int,
+    fecha_apertura: date,
+    fecha_vencimiento: date,
+    renovacion_automatica: bool,
+    instruccion_renovacion: str | None,
+) -> dict:
+    """Columnas de `ahorros` más el detalle `cdt` (no es una meta: el monto del CDT es el monto actual)."""
+    entidad = _nombre_requerido(entidad, "Selecciona la entidad financiera.")
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre del CDT.")
+    if monto <= 0:
+        raise ValueError("Ingresa el monto del CDT.")
+    if fecha_vencimiento <= fecha_apertura:
+        raise ValueError("La fecha de vencimiento debe ser posterior a la fecha de apertura.")
+
+    columnas = _columnas(
+        categoria="CDT", subtipo=tipo_tasa, nombre=nombre, descripcion=descripcion,
+        monto_actual=monto, moneda=moneda, metodo="MANUAL",
+    )
+    columnas["cdt"] = {
+        "entidad": entidad,
+        "tasa_interes": tasa_interes,
+        "plazo_meses": plazo_meses,
+        "fecha_apertura": fecha_apertura,
+        "fecha_vencimiento": fecha_vencimiento,
+        "renovacion_automatica": renovacion_automatica,
+        # Las instrucciones solo tienen sentido si el CDT se renueva solo.
+        "instruccion_renovacion": (instruccion_renovacion or "MISMO_MONTO") if renovacion_automatica else None,
+    }
+    return columnas
+
+
 # Cómo se valida cada categoría; las llaves son las del segmento de la ruta POST /ahorros/<categoria>
 # y las mismas que `routers/ahorros.ESQUEMAS_POR_CATEGORIA` (que dice qué cuerpo recibe cada una).
 VALIDADORES_POR_CATEGORIA = {
@@ -212,11 +252,12 @@ VALIDADORES_POR_CATEGORIA = {
     "alcancia": validar_ahorro_alcancia,
     "ahorro-programado": validar_ahorro_programado,
     "fondo-inversion": validar_ahorro_fondo,
+    "cdt": validar_ahorro_cdt,
 }
 
 # Detalle 1:1 que guarda cada categoría que lo tiene: la llave es la de `columnas` y la del
 # atributo de `Ahorro` que lo relaciona.
-DETALLE_POR_CLAVE = {"programado": AhorroProgramado, "fondo": AhorroFondo}
+DETALLE_POR_CLAVE = {"programado": AhorroProgramado, "fondo": AhorroFondo, "cdt": AhorroCdt}
 
 
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:

@@ -683,6 +683,55 @@
           }
         },
         {
+          "name": "Registrar - CDT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría CDT con su detalle, sin meta', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('CDT');",
+                  "    pm.expect(ahorro.subtipo).to.eql('FIJA');",
+                  "    pm.expect(ahorro.es_meta).to.eql(false);",
+                  "    pm.expect(ahorro.monto_actual).to.eql(5000000);",
+                  "    pm.expect(ahorro.tasa_interes).to.eql(11.5);",
+                  "    pm.expect(ahorro.fecha_vencimiento).to.eql('2027-11-01');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/cdt",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "cdt"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_tasa\": \"FIJA\",\n  \"entidad\": \"Bancolombia\",\n  \"nombre\": \"CDT Ahorro Viaje\",\n  \"descripcion\": \"CDT para ahorro del viaje familiar.\",\n  \"monto\": 5000000,\n  \"moneda\": \"COP\",\n  \"tasa_interes\": 11.5,\n  \"plazo_meses\": 12,\n  \"fecha_apertura\": \"2026-11-01\",\n  \"fecha_vencimiento\": \"2027-11-01\",\n  \"renovacion_automatica\": true,\n  \"instruccion_renovacion\": \"MISMO_MONTO\"\n}"
+            }
+          }
+        },
+        {
           "name": "Eliminar ahorro (usa ahorro_id del último creado)",
           "event": [
             {
