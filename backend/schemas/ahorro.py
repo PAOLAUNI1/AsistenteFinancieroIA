@@ -29,6 +29,8 @@ TipoRentabilidad = Literal["FIJA", "VARIABLE"]
 # CDT: el tipo de tasa es el subtipo del ahorro; las instrucciones dicen qué se renueva al vencer.
 TipoTasaCdt = Literal["FIJA", "VARIABLE"]
 InstruccionRenovacion = Literal["MISMO_MONTO", "CAPITAL_E_INTERESES", "SOLO_CAPITAL"]
+# Cuenta de ahorro: el tipo de cuenta es el subtipo del ahorro.
+TipoCuenta = Literal["AHORROS", "NOMINA", "DIGITAL", "OTRA"]
 
 
 class AhorroOtroIn(BaseModel):
@@ -88,6 +90,20 @@ class AhorroFondoIn(BaseModel):
     tasa_rendimiento: TasaNoNegativa
     tipo_rentabilidad: TipoRentabilidad = "VARIABLE"
     reinversion: bool = False
+
+
+class AhorroCuentaIn(BaseModel):
+    tipo_cuenta: TipoCuenta = "AHORROS"
+    entidad: str = Field(max_length=100)
+    nombre: str = Field(max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    monto_actual: MontoNoNegativo = 0.0
+    moneda: Moneda = "COP"
+    # Meta opcional: solo se usa cuando es_meta es verdadero.
+    es_meta: bool = False
+    meta_nombre: str | None = Field(default=None, max_length=100)
+    monto_objetivo: MontoPositivo | None = None
+    fecha_objetivo: date | None = None
 
 
 class AhorroCdtIn(BaseModel):

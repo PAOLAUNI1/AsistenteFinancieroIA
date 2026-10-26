@@ -10,7 +10,7 @@ from datetime import date
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.models import Ahorro, AhorroCdt, AhorroFondo, AhorroProgramado
+from backend.models import Ahorro, AhorroCdt, AhorroCuenta, AhorroFondo, AhorroProgramado
 from backend.tiempo import hoy_colombia
 
 logger = logging.getLogger(__name__)
@@ -205,6 +205,47 @@ def validar_ahorro_fondo(
     return columnas
 
 
+def validar_ahorro_cuenta(
+    *,
+    tipo_cuenta: str,
+    entidad: str,
+    nombre: str,
+    descripcion: str | None,
+    monto_actual: float,
+    moneda: str,
+    es_meta: bool,
+    meta_nombre: str | None,
+    monto_objetivo: float | None,
+    fecha_objetivo: date | None,
+) -> dict:
+    """Columnas de `ahorros` más el detalle `cuenta` (la meta es opcional, como en "Otro")."""
+    entidad = _nombre_requerido(entidad, "Selecciona la entidad financiera.")
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre de la cuenta.")
+    if monto_actual < 0:
+        raise ValueError("El monto actual no puede ser negativo.")
+
+    meta: dict = {}
+    if es_meta:
+        if monto_objetivo is None or monto_objetivo <= 0:
+            raise ValueError("Ingresa el monto objetivo de la meta.")
+        if fecha_objetivo is None:
+            raise ValueError("Selecciona la fecha objetivo.")
+        _exigir_fecha_no_pasada(fecha_objetivo)
+        meta = {
+            "es_meta": True,
+            "meta_nombre": meta_nombre,
+            "monto_objetivo": monto_objetivo,
+            "fecha_objetivo": fecha_objetivo,
+        }
+
+    columnas = _columnas(
+        categoria="CUENTA", subtipo=tipo_cuenta, nombre=nombre, descripcion=descripcion,
+        monto_actual=monto_actual, moneda=moneda, metodo="MANUAL", **meta,
+    )
+    columnas["cuenta"] = {"entidad": entidad}
+    return columnas
+
+
 def validar_ahorro_cdt(
     *,
     tipo_tasa: str,
@@ -253,11 +294,17 @@ VALIDADORES_POR_CATEGORIA = {
     "ahorro-programado": validar_ahorro_programado,
     "fondo-inversion": validar_ahorro_fondo,
     "cdt": validar_ahorro_cdt,
+    "cuenta": validar_ahorro_cuenta,
 }
 
 # Detalle 1:1 que guarda cada categoría que lo tiene: la llave es la de `columnas` y la del
 # atributo de `Ahorro` que lo relaciona.
-DETALLE_POR_CLAVE = {"programado": AhorroProgramado, "fondo": AhorroFondo, "cdt": AhorroCdt}
+DETALLE_POR_CLAVE = {
+    "programado": AhorroProgramado,
+    "fondo": AhorroFondo,
+    "cdt": AhorroCdt,
+    "cuenta": AhorroCuenta,
+}
 
 
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:

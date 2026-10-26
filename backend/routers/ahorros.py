@@ -7,6 +7,7 @@ from backend.models import Usuario
 from backend.schemas.ahorro import (
     AhorroAlcanciaIn,
     AhorroCdtIn,
+    AhorroCuentaIn,
     AhorroFondoIn,
     AhorroOtroIn,
     AhorroOut,
@@ -24,6 +25,7 @@ ESQUEMAS_POR_CATEGORIA = {
     "ahorro-programado": AhorroProgramadoIn,
     "fondo-inversion": AhorroFondoIn,
     "cdt": AhorroCdtIn,
+    "cuenta": AhorroCuentaIn,
 }
 
 

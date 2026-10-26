@@ -732,6 +732,54 @@
           }
         },
         {
+          "name": "Registrar - Cuenta de ahorro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría CUENTA con su meta y su entidad', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('CUENTA');",
+                  "    pm.expect(ahorro.subtipo).to.eql('AHORROS');",
+                  "    pm.expect(ahorro.entidad).to.eql('Bancolombia');",
+                  "    pm.expect(ahorro.es_meta).to.eql(true);",
+                  "    pm.expect(ahorro.progreso).to.eql(33.3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/cuenta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "cuenta"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_cuenta\": \"AHORROS\",\n  \"entidad\": \"Bancolombia\",\n  \"nombre\": \"Ahorro futuros viajes\",\n  \"descripcion\": \"Ahorro para viaje familiar a Disney con mi hija.\",\n  \"monto_actual\": 5000000,\n  \"moneda\": \"COP\",\n  \"es_meta\": true,\n  \"meta_nombre\": \"Viaje familiar a Disney\",\n  \"monto_objetivo\": 15000000,\n  \"fecha_objetivo\": \"2030-06-30\"\n}"
+            }
+          }
+        },
+        {
           "name": "Eliminar ahorro (usa ahorro_id del último creado)",
           "event": [
             {

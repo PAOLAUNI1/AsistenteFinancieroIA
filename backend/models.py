@@ -319,6 +319,10 @@ class Ahorro(Base):
     cdt: Mapped["AhorroCdt | None"] = relationship(
         lazy="joined", uselist=False, cascade="all, delete-orphan"
     )
+    # Detalle 1:1 de la categoría CUENTA.
+    cuenta: Mapped["AhorroCuenta | None"] = relationship(
+        lazy="joined", uselist=False, cascade="all, delete-orphan"
+    )
 
     # Lo propio del ahorro programado, expuesto como atributos del ahorro (AhorroOut lo lee directo).
     @property
@@ -333,10 +337,10 @@ class Ahorro(Base):
     def fecha_inicio(self) -> date | None:
         return self.programado.fecha_inicio if self.programado else None
 
-    # Lo propio del fondo de inversión y del CDT, igual que lo del ahorro programado.
+    # Lo propio del fondo, el CDT y la cuenta de ahorro, igual que lo del ahorro programado.
     @property
     def entidad(self) -> str | None:
-        detalle = self.fondo or self.cdt
+        detalle = self.fondo or self.cdt or self.cuenta
         return detalle.entidad if detalle else None
 
     @property
@@ -400,6 +404,19 @@ class AhorroProgramado(Base):
         Enum("SEMANAL", "QUINCENAL", "MENSUAL", name="periodicidad_ahorro"), nullable=False
     )
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class AhorroCuenta(Base):
+    """Detalle 1:1 para ahorros de categoría CUENTA (el tipo de cuenta es el subtipo del ahorro)."""
+
+    __tablename__ = "ahorro_cuenta"
+
+    ahorro_id: Mapped[int] = mapped_column(
+        Integer().with_variant(mysql.INTEGER(unsigned=True), "mysql"),
+        ForeignKey("ahorros.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    entidad: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
 class AhorroCdt(Base):

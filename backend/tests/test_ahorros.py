@@ -775,3 +775,158 @@ def test_eliminar_un_cdt_borra_tambien_su_detalle(client, usuario_id):
     assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
 
     assert detalles() == 0
+
+
+# --------------------------------------------------------- cuenta de ahorro
+
+CUENTA = {
+    "tipo_cuenta": "AHORROS",
+    "entidad": "Bancolombia",
+    "nombre": "Ahorro futuros viajes",
+    "descripcion": "Ahorro para viaje familiar a Disney con mi hija.",
+    "monto_actual": 5_000_000,
+    "moneda": "COP",
+    "es_meta": True,
+    "meta_nombre": "Viaje familiar a Disney",
+    "monto_objetivo": 15_000_000,
+    "fecha_objetivo": "2099-06-30",
+}
+
+
+def _cuenta(client, usuario_id, cuerpo):
+    return client.post("/ahorros/cuenta", params={"usuario_id": usuario_id}, json=cuerpo)
+
+
+def test_una_cuenta_con_meta_se_registra_y_calcula_el_progreso(client, usuario_id):
+    respuesta = _cuenta(client, usuario_id, CUENTA)
+
+    assert respuesta.status_code == 201, respuesta.text
+    ahorro = respuesta.json()
+    assert ahorro["categoria"] == "CUENTA"
+    assert ahorro["subtipo"] == "AHORROS"  # el tipo de cuenta es el subtipo
+    assert ahorro["nombre"] == "Ahorro futuros viajes"
+    assert ahorro["monto_actual"] == 5_000_000
+    assert ahorro["moneda"] == "COP"
+    assert ahorro["metodo"] == "MANUAL"
+    assert ahorro["estado"] == "ACTIVA"
+    assert ahorro["entidad"] == "Bancolombia"
+    assert ahorro["es_meta"] is True
+    assert ahorro["monto_objetivo"] == 15_000_000
+    assert ahorro["fecha_objetivo"] == "2099-06-30"
+    assert ahorro["progreso"] == 33.3  # 5.000.000 de 15.000.000, como en el diseño
+
+
+def test_una_cuenta_sin_meta_no_guarda_los_datos_de_la_meta(client, usuario_id):
+    ahorro = _cuenta(client, usuario_id, {**CUENTA, "es_meta": False}).json()
+
+    assert ahorro["es_meta"] is False
+    assert ahorro["monto_objetivo"] is None
+    assert ahorro["fecha_objetivo"] is None
+    assert ahorro["meta_nombre"] is None
+    assert ahorro["progreso"] is None
+    assert ahorro["entidad"] == "Bancolombia"
+
+
+def test_el_tipo_de_cuenta_es_ahorros_por_defecto_y_el_monto_actual_puede_ser_cero(client, usuario_id):
+    minimo = {"entidad": "Bancolombia", "nombre": "Mi cuenta"}
+
+    ahorro = _cuenta(client, usuario_id, minimo).json()
+
+    assert ahorro["subtipo"] == "AHORROS"
+    assert ahorro["monto_actual"] == 0
+    assert ahorro["moneda"] == "COP"
+
+
+@pytest.mark.parametrize("tipo_cuenta", ["AHORROS", "NOMINA", "DIGITAL", "OTRA"])
+def test_se_aceptan_los_tipos_de_cuenta(client, usuario_id, tipo_cuenta):
+    respuesta = _cuenta(client, usuario_id, {**CUENTA, "tipo_cuenta": tipo_cuenta})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["subtipo"] == tipo_cuenta
+
+
+@pytest.mark.parametrize("moneda", ["COP", "USD", "EUR"])
+def test_la_cuenta_acepta_las_tres_monedas(client, usuario_id, moneda):
+    assert _cuenta(client, usuario_id, {**CUENTA, "moneda": moneda}).json()["moneda"] == moneda
+
+
+def test_el_detalle_de_la_cuenta_vuelve_en_el_listado_junto_al_de_fondo_y_cdt(client, usuario_id):
+    _cuenta(client, usuario_id, CUENTA)
+    _fondo(client, usuario_id, FONDO)
+    _cdt(client, usuario_id, CDT)
+    _registrar(client, usuario_id, BASICO)
+
+    por_categoria = {
+        a["categoria"]: a for a in client.get("/ahorros", params={"usuario_id": usuario_id}).json()
+    }
+
+    assert por_categoria["CUENTA"]["entidad"] == "Bancolombia"
+    assert por_categoria["OTRO"]["entidad"] is None
+    # La cuenta no trae lo propio del fondo ni del CDT.
+    assert por_categoria["CUENTA"]["tasa_rendimiento"] is None
+    assert por_categoria["CUENTA"]["tasa_interes"] is None
+
+
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"entidad": "  "}, "Selecciona la entidad financiera."),
+        ({"nombre": "  "}, "Ingresa el nombre de la cuenta."),
+        ({"es_meta": True, "monto_objetivo": None}, "Ingresa el monto objetivo de la meta."),
+        ({"fecha_objetivo": None}, "Selecciona la fecha objetivo."),
+        (
+            {"fecha_objetivo": (date.today() - timedelta(days=2)).isoformat()},
+            "La fecha objetivo no puede ser anterior a hoy.",
+        ),
+    ],
+)
+def test_las_reglas_de_la_cuenta_dan_422_con_su_mensaje(client, usuario_id, cambios, mensaje):
+    respuesta = _cuenta(client, usuario_id, {**CUENTA, **cambios})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["detail"] == mensaje
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"tipo_cuenta": "CORRIENTE"},
+        {"monto_actual": -1},
+        {"monto_actual": 10**14},
+        {"es_meta": True, "monto_objetivo": 0},
+        {"moneda": "XXX"},
+        {"entidad": "x" * 101},
+        {"nombre": "x" * 101},
+        {"meta_nombre": "x" * 101},
+        {"descripcion": "x" * 201},
+        {"fecha_objetivo": "no es fecha"},
+    ],
+)
+def test_datos_fuera_de_rango_de_la_cuenta_dan_422(client, usuario_id, cambios):
+    assert _cuenta(client, usuario_id, {**CUENTA, **cambios}).status_code == 422
+
+
+@pytest.mark.parametrize("campo", ["entidad", "nombre"])
+def test_los_campos_obligatorios_de_la_cuenta(client, usuario_id, campo):
+    cuerpo = {k: v for k, v in CUENTA.items() if k != campo}
+
+    assert _cuenta(client, usuario_id, cuerpo).status_code == 422
+
+
+def test_registrar_una_cuenta_sin_token_responde_401(client):
+    assert client.post("/ahorros/cuenta", json=CUENTA).status_code == 401
+
+
+def test_eliminar_una_cuenta_borra_tambien_su_detalle(client, usuario_id):
+    from backend.models import AhorroCuenta
+
+    def detalles():
+        with client.session_factory() as db:
+            return db.query(AhorroCuenta).count()
+
+    id_ahorro = _cuenta(client, usuario_id, CUENTA).json()["id"]
+    assert detalles() == 1
+
+    assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
+
+    assert detalles() == 0
