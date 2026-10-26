@@ -16,6 +16,19 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+DROP TABLE IF EXISTS `ahorro_programado`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ahorro_programado` (
+  `ahorro_id` int unsigned NOT NULL,
+  `monto_periodo` decimal(15,2) NOT NULL COMMENT 'Cuánto se ahorra en cada periodo',
+  `periodicidad` enum('SEMANAL','QUINCENAL','MENSUAL') NOT NULL,
+  `fecha_inicio` date NOT NULL,
+  PRIMARY KEY (`ahorro_id`),
+  CONSTRAINT `fk_ahorro_programado_ahorro` FOREIGN KEY (`ahorro_id`) REFERENCES `ahorros` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_ahorro_programado_monto` CHECK ((`monto_periodo` > 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ahorros`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -32,7 +45,7 @@ CREATE TABLE `ahorros` (
   `meta_nombre` varchar(100) DEFAULT NULL,
   `monto_objetivo` decimal(15,2) DEFAULT NULL,
   `fecha_objetivo` date DEFAULT NULL,
-  `metodo` enum('MANUAL','PROGRAMADO','REDONDEO','AUTOMATICO') NOT NULL DEFAULT 'MANUAL',
+  `metodo` enum('MANUAL','PROGRAMADO','REDONDEO','AUTOMATICO','RECORDATORIO') NOT NULL DEFAULT 'MANUAL',
   `estado` enum('ACTIVA','CUMPLIDA','CANCELADA') NOT NULL DEFAULT 'ACTIVA',
   `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -18,6 +18,10 @@
       "value": ""
     },
     {
+      "key": "ahorro_id",
+      "value": ""
+    },
+    {
       "key": "token",
       "value": ""
     }
@@ -455,6 +459,203 @@
               "path": [
                 "deudas",
                 "{{deuda_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ahorros",
+      "item": [
+        {
+          "name": "Listar ahorros",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve una lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/ahorros",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar - Otro tipo de ahorro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría OTRO con progreso 16 %', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('OTRO');",
+                  "    pm.expect(ahorro.progreso).to.eql(16);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/otro",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "otro"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subtipo\": \"EMERGENCIAS\",\n  \"nombre\": \"Ahorro para emergencias\",\n  \"descripcion\": \"Fondo para imprevistos y eventualidades.\",\n  \"monto_actual\": 800000,\n  \"moneda\": \"COP\",\n  \"es_meta\": true,\n  \"meta_nombre\": \"Fondo de emergencias\",\n  \"monto_objetivo\": 5000000,\n  \"fecha_objetivo\": \"2030-12-31\",\n  \"metodo\": \"MANUAL\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Alcancía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría ALCANCIA, siempre es una meta', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('ALCANCIA');",
+                  "    pm.expect(ahorro.es_meta).to.eql(true);",
+                  "    pm.expect(ahorro.monto_actual).to.eql(200000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/alcancia",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "alcancia"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subtipo\": \"META_PERSONALIZADA\",\n  \"nombre\": \"Nueva laptop\",\n  \"descripcion\": \"Ahorro para comprar mi laptop de trabajo y estudio.\",\n  \"monto_objetivo\": 3000000,\n  \"moneda\": \"COP\",\n  \"fecha_objetivo\": \"2030-06-30\",\n  \"metodo\": \"REDONDEO\",\n  \"aporte_inicial\": 200000\n}"
+            }
+          }
+        },
+        {
+          "name": "Registrar - Ahorro programado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría PROGRAMADO con su detalle', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('PROGRAMADO');",
+                  "    pm.expect(ahorro.monto_periodo).to.eql(300000);",
+                  "    pm.expect(ahorro.periodicidad).to.eql('MENSUAL');",
+                  "    pm.expect(ahorro.fecha_inicio).to.eql('2030-01-01');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/ahorro-programado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "ahorro-programado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subtipo\": \"VIAJES\",\n  \"nombre\": \"Vacaciones 2031\",\n  \"descripcion\": \"Ahorro para viaje familiar a Cartagena.\",\n  \"monto_objetivo\": 3000000,\n  \"monto_inicial\": 200000,\n  \"moneda\": \"COP\",\n  \"monto_periodo\": 300000,\n  \"periodicidad\": \"MENSUAL\",\n  \"fecha_inicio\": \"2030-01-01\",\n  \"fecha_objetivo\": \"2030-12-31\",\n  \"metodo\": \"AUTOMATICO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar ahorro (usa ahorro_id del último creado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/ahorros/{{ahorro_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "{{ahorro_id}}"
               ]
             }
           }

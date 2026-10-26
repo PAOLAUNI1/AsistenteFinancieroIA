@@ -273,3 +273,166 @@ def test_el_aporte_inicial_puede_superar_el_objetivo_y_el_progreso_queda_en_100(
     assert respuesta.status_code == 201
     assert respuesta.json()["monto_actual"] == 4_000_000
     assert respuesta.json()["progreso"] == 100.0
+
+
+# ------------------------------------------------------- ahorro programado
+
+PROGRAMADO = {
+    "subtipo": "VIAJES",
+    "nombre": "Vacaciones 2027",
+    "descripcion": "Ahorro para viaje familiar a Cartagena.",
+    "monto_objetivo": 3_000_000,
+    "monto_inicial": 200_000,
+    "monto_periodo": 300_000,
+    "periodicidad": "MENSUAL",
+    "fecha_inicio": "2099-01-01",
+    "fecha_objetivo": "2099-12-31",
+    "metodo": "AUTOMATICO",
+}
+
+
+def _programado(client, usuario_id, cuerpo):
+    return client.post("/ahorros/ahorro-programado", params={"usuario_id": usuario_id}, json=cuerpo)
+
+
+def test_un_ahorro_programado_se_registra_como_meta_con_su_detalle(client, usuario_id):
+    respuesta = _programado(client, usuario_id, PROGRAMADO)
+
+    assert respuesta.status_code == 201, respuesta.text
+    ahorro = respuesta.json()
+    assert ahorro["categoria"] == "PROGRAMADO"
+    assert ahorro["subtipo"] == "VIAJES"
+    assert ahorro["nombre"] == "Vacaciones 2027"
+    assert ahorro["es_meta"] is True
+    assert ahorro["monto_objetivo"] == 3_000_000
+    assert ahorro["monto_actual"] == 200_000
+    assert ahorro["moneda"] == "COP"
+    assert ahorro["fecha_objetivo"] == "2099-12-31"
+    assert ahorro["metodo"] == "AUTOMATICO"
+    assert ahorro["estado"] == "ACTIVA"
+    assert ahorro["progreso"] == 6.7
+    assert ahorro["monto_periodo"] == 300_000
+    assert ahorro["periodicidad"] == "MENSUAL"
+    assert ahorro["fecha_inicio"] == "2099-01-01"
+
+
+def test_el_detalle_programado_vuelve_en_el_listado(client, usuario_id):
+    _programado(client, usuario_id, PROGRAMADO)
+    _registrar(client, usuario_id, BASICO)
+
+    por_categoria = {
+        a["categoria"]: a for a in client.get("/ahorros", params={"usuario_id": usuario_id}).json()
+    }
+
+    assert por_categoria["PROGRAMADO"]["monto_periodo"] == 300_000
+    assert por_categoria["PROGRAMADO"]["fecha_inicio"] == "2099-01-01"
+    # Las demás categorías no traen detalle programado.
+    assert por_categoria["OTRO"]["monto_periodo"] is None
+    assert por_categoria["OTRO"]["periodicidad"] is None
+    assert por_categoria["OTRO"]["fecha_inicio"] is None
+
+
+def test_el_monto_inicial_es_opcional_y_arranca_en_cero(client, usuario_id):
+    cuerpo = {k: v for k, v in PROGRAMADO.items() if k != "monto_inicial"}
+
+    ahorro = _programado(client, usuario_id, cuerpo).json()
+
+    assert ahorro["monto_actual"] == 0
+    assert ahorro["progreso"] == 0.0
+
+
+@pytest.mark.parametrize("subtipo", ["META_PERSONALIZADA", "VIAJES", "ESTUDIOS", "EMERGENCIAS", "OTRO_OBJETIVO"])
+def test_se_aceptan_los_cinco_objetivos_del_ahorro_programado(client, usuario_id, subtipo):
+    assert _programado(client, usuario_id, {**PROGRAMADO, "subtipo": subtipo}).status_code == 201
+
+
+@pytest.mark.parametrize("periodicidad", ["SEMANAL", "QUINCENAL", "MENSUAL"])
+def test_se_aceptan_las_tres_periodicidades(client, usuario_id, periodicidad):
+    respuesta = _programado(client, usuario_id, {**PROGRAMADO, "periodicidad": periodicidad})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["periodicidad"] == periodicidad
+
+
+@pytest.mark.parametrize("metodo", ["AUTOMATICO", "RECORDATORIO"])
+def test_el_metodo_es_transferencia_automatica_o_recordatorio(client, usuario_id, metodo):
+    respuesta = _programado(client, usuario_id, {**PROGRAMADO, "metodo": metodo})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["metodo"] == metodo
+
+
+def test_recordatorio_solo_lo_acepta_el_ahorro_programado(client, usuario_id):
+    assert _registrar(client, usuario_id, {**BASICO, "metodo": "RECORDATORIO"}).status_code == 422
+    assert _alcancia(client, usuario_id, {**ALCANCIA, "metodo": "RECORDATORIO"}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"nombre": "  "}, "Ingresa el nombre de la meta."),
+        ({"monto_inicial": 3_000_000}, "El monto inicial debe ser menor que el monto objetivo."),
+        (
+            {"fecha_inicio": (date.today() - timedelta(days=2)).isoformat()},
+            "La fecha de inicio no puede ser anterior a hoy.",
+        ),
+        (
+            {"fecha_inicio": "2099-06-01", "fecha_objetivo": "2099-06-01"},
+            "La fecha objetivo debe ser posterior a la fecha de inicio.",
+        ),
+        (
+            {"fecha_inicio": "2099-06-01", "fecha_objetivo": "2099-05-01"},
+            "La fecha objetivo debe ser posterior a la fecha de inicio.",
+        ),
+    ],
+)
+def test_las_reglas_del_ahorro_programado_dan_422_con_su_mensaje(client, usuario_id, cambios, mensaje):
+    respuesta = _programado(client, usuario_id, {**PROGRAMADO, **cambios})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["detail"] == mensaje
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"subtipo": "VACACIONES"},
+        {"monto_objetivo": 0},
+        {"monto_periodo": 0},
+        {"monto_periodo": -1},
+        {"monto_inicial": -1},
+        {"periodicidad": "ANUAL"},
+        {"metodo": "MANUAL"},
+        {"moneda": "XXX"},
+        {"nombre": "x" * 101},
+        {"fecha_inicio": "no es fecha"},
+    ],
+)
+def test_datos_fuera_de_rango_del_ahorro_programado_dan_422(client, usuario_id, cambios):
+    assert _programado(client, usuario_id, {**PROGRAMADO, **cambios}).status_code == 422
+
+
+@pytest.mark.parametrize("campo", ["monto_objetivo", "monto_periodo", "fecha_inicio", "fecha_objetivo"])
+def test_los_campos_obligatorios_del_ahorro_programado(client, usuario_id, campo):
+    cuerpo = {k: v for k, v in PROGRAMADO.items() if k != campo}
+
+    assert _programado(client, usuario_id, cuerpo).status_code == 422
+
+
+def test_registrar_un_ahorro_programado_sin_token_responde_401(client):
+    assert client.post("/ahorros/ahorro-programado", json=PROGRAMADO).status_code == 401
+
+
+def test_eliminar_un_ahorro_programado_borra_tambien_su_detalle(client, usuario_id):
+    from backend.models import AhorroProgramado
+
+    def detalles():
+        with client.session_factory() as db:
+            return db.query(AhorroProgramado).count()
+
+    id_ahorro = _programado(client, usuario_id, PROGRAMADO).json()["id"]
+    assert detalles() == 1
+
+    assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
+
+    assert detalles() == 0

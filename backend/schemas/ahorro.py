@@ -13,10 +13,15 @@ SubtipoOtro = Literal[
 SubtipoAlcancia = Literal[
     "META_PERSONALIZADA", "VACACIONES", "EMERGENCIAS", "EDUCACION", "VIVIENDA", "OTRO"
 ]
+# Subtipos de ahorro programado: el objetivo de la meta (pantalla 3 del diseño de ahorro programado).
+SubtipoProgramado = Literal["META_PERSONALIZADA", "VIAJES", "ESTUDIOS", "EMERGENCIAS", "OTRO_OBJETIVO"]
 Moneda = Literal["COP", "USD", "EUR"]
 MetodoAhorro = Literal["MANUAL", "PROGRAMADO", "AUTOMATICO"]
 # La alcancía admite además ahorrar el cambio de los gastos.
 MetodoAlcancia = Literal["MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO"]
+# El ahorro programado se cumple con una transferencia automática o con un recordatorio.
+MetodoProgramado = Literal["AUTOMATICO", "RECORDATORIO"]
+PeriodicidadAhorro = Literal["SEMANAL", "QUINCENAL", "MENSUAL"]
 
 
 class AhorroOtroIn(BaseModel):
@@ -46,6 +51,21 @@ class AhorroAlcanciaIn(BaseModel):
     aporte_inicial: MontoNoNegativo = 0.0
 
 
+class AhorroProgramadoIn(BaseModel):
+    subtipo: SubtipoProgramado
+    nombre: str = Field(max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    # Siempre es una meta: el monto objetivo y la fecha objetivo son obligatorios.
+    monto_objetivo: MontoPositivo
+    monto_inicial: MontoNoNegativo = 0.0
+    moneda: Moneda = "COP"
+    monto_periodo: MontoPositivo
+    periodicidad: PeriodicidadAhorro = "MENSUAL"
+    fecha_inicio: date
+    fecha_objetivo: date
+    metodo: MetodoProgramado = "AUTOMATICO"
+
+
 class AhorroOut(BaseModel):
     # Se arma directo desde el modelo SQLAlchemy (los Decimal de MySQL pasan a float).
     model_config = ConfigDict(from_attributes=True)
@@ -64,6 +84,10 @@ class AhorroOut(BaseModel):
     metodo: str
     estado: str
     fecha_registro: datetime
+    # Solo en los ahorros programados; nulos en las demás categorías.
+    monto_periodo: float | None = None
+    periodicidad: str | None = None
+    fecha_inicio: date | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

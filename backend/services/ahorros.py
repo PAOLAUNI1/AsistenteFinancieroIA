@@ -10,7 +10,7 @@ from datetime import date
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.models import Ahorro
+from backend.models import Ahorro, AhorroProgramado
 from backend.tiempo import hoy_colombia
 
 logger = logging.getLogger(__name__)
@@ -125,16 +125,65 @@ def validar_ahorro_alcancia(
     )
 
 
+def validar_ahorro_programado(
+    *,
+    subtipo: str,
+    nombre: str,
+    descripcion: str | None,
+    monto_objetivo: float,
+    monto_inicial: float,
+    moneda: str,
+    monto_periodo: float,
+    periodicidad: str,
+    fecha_inicio: date,
+    fecha_objetivo: date,
+    metodo: str,
+) -> dict:
+    """Columnas de `ahorros` más el detalle `programado` (siempre es una meta con fechas)."""
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre de la meta.")
+    if monto_objetivo <= 0:
+        raise ValueError("Ingresa el monto objetivo de la meta.")
+    if monto_inicial < 0:
+        raise ValueError("El monto inicial no puede ser negativo.")
+    if monto_inicial >= monto_objetivo:
+        raise ValueError("El monto inicial debe ser menor que el monto objetivo.")
+    if monto_periodo <= 0:
+        raise ValueError("Ingresa el monto a ahorrar por periodo.")
+    if fecha_inicio < hoy_colombia():
+        raise ValueError("La fecha de inicio no puede ser anterior a hoy.")
+    _exigir_fecha_no_pasada(fecha_objetivo)
+    if fecha_objetivo <= fecha_inicio:
+        raise ValueError("La fecha objetivo debe ser posterior a la fecha de inicio.")
+
+    columnas = _columnas(
+        categoria="PROGRAMADO", subtipo=subtipo, nombre=nombre, descripcion=descripcion,
+        monto_actual=monto_inicial, moneda=moneda, metodo=metodo,
+        es_meta=True, monto_objetivo=monto_objetivo, fecha_objetivo=fecha_objetivo,
+    )
+    columnas["programado"] = {
+        "monto_periodo": monto_periodo,
+        "periodicidad": periodicidad,
+        "fecha_inicio": fecha_inicio,
+    }
+    return columnas
+
+
 # Cómo se valida cada categoría; las llaves son las del segmento de la ruta POST /ahorros/<categoria>
 # y las mismas que `routers/ahorros.ESQUEMAS_POR_CATEGORIA` (que dice qué cuerpo recibe cada una).
 VALIDADORES_POR_CATEGORIA = {
     "otro": validar_ahorro_otro,
     "alcancia": validar_ahorro_alcancia,
+    "ahorro-programado": validar_ahorro_programado,
 }
 
 
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:
+    # Lo que va a la tabla de detalle de la categoría viaja aparte de las columnas de `ahorros`.
+    columnas = dict(columnas)
+    detalle_programado = columnas.pop("programado", None)
     ahorro = Ahorro(usuario_id=usuario_id, **columnas)
+    if detalle_programado is not None:
+        ahorro.programado = AhorroProgramado(**detalle_programado)
     try:
         db.add(ahorro)
         db.commit()

@@ -290,7 +290,10 @@ class Ahorro(Base):
     monto_objetivo: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     fecha_objetivo: Mapped[date | None] = mapped_column(Date, nullable=True)
     metodo: Mapped[str] = mapped_column(
-        Enum("MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO", name="metodo_ahorro"),
+        Enum(
+            "MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO", "RECORDATORIO",
+            name="metodo_ahorro",
+        ),
         nullable=False,
         default="MANUAL",
     )
@@ -303,6 +306,42 @@ class Ahorro(Base):
     fecha_actualizacion: Mapped[datetime] = mapped_column(
         DateTime, default=ahora_utc, onupdate=ahora_utc
     )
+
+    # Detalle 1:1 de la categoría PROGRAMADO (joined: el listado no hace una consulta por ahorro).
+    programado: Mapped["AhorroProgramado | None"] = relationship(
+        lazy="joined", uselist=False, cascade="all, delete-orphan"
+    )
+
+    # Lo propio del ahorro programado, expuesto como atributos del ahorro (AhorroOut lo lee directo).
+    @property
+    def monto_periodo(self) -> float | None:
+        return self.programado.monto_periodo if self.programado else None
+
+    @property
+    def periodicidad(self) -> str | None:
+        return self.programado.periodicidad if self.programado else None
+
+    @property
+    def fecha_inicio(self) -> date | None:
+        return self.programado.fecha_inicio if self.programado else None
+
+
+class AhorroProgramado(Base):
+    """Detalle 1:1 para ahorros de categoría PROGRAMADO: cuánto se ahorra, cada cuánto y desde cuándo."""
+
+    __tablename__ = "ahorro_programado"
+
+    # La base real usa INT UNSIGNED en ahorros.id; la FK debe tener el mismo tipo.
+    ahorro_id: Mapped[int] = mapped_column(
+        Integer().with_variant(mysql.INTEGER(unsigned=True), "mysql"),
+        ForeignKey("ahorros.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    monto_periodo: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)
+    periodicidad: Mapped[str] = mapped_column(
+        Enum("SEMANAL", "QUINCENAL", "MENSUAL", name="periodicidad_ahorro"), nullable=False
+    )
+    fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
 
 
 # Tabla de detalle 1:1 por código de tipo de deuda (los tipos que no están aquí
