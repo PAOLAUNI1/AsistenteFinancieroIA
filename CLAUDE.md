@@ -1098,22 +1098,22 @@ backend/
 ├── models.py          # modelos SQLAlchemy (+ DETALLE_POR_TIPO: tabla de detalle de cada tipo)
 ├── tiempo.py          # ahora_utc() para lo guardado y hoy_colombia() para "hoy" (America/Bogota)
 ├── routers/           # usuarios, catalogos, deudas, ahorros, perfil, analisis (solo traducen HTTP)
-├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo) y comunes (tipos de monto)
+├── schemas/           # contratos Pydantic (usuario, deuda, ahorro, perfil, analisis, catalogo) y comunes (tipos de monto y de tasa)
 ├── services/          # reglas: deudas, repositorio_deudas, ahorros, perfil, analisis, moneda, seguridad, tokens, limite_intentos, ip_cliente
-├── tests/             # pytest (362 pruebas)
+├── tests/             # pytest (398 pruebas)
 └── postman/           # colección AsistenteFinancieroIA.postman_collection.json (carpetas Usuarios, Catálogos, Deudas, Ahorros, Perfil y Análisis)
 db/
-├── schema.sql         # estructura de las 16 tablas (empieza con DROP TABLE: solo para bases nuevas)
+├── schema.sql         # estructura de las 17 tablas (empieza con DROP TABLE: solo para bases nuevas)
 ├── seed.sql           # catálogos: tipos de deuda y categorías de gasto
-└── migraciones/       # cambios para bases que ya tienen datos (idempotentes): 001_ahorros.sql, 002_ahorros_metodo_redondeo.sql, 003_ahorro_programado.sql
+└── migraciones/       # cambios para bases que ya tienen datos (idempotentes): 001_ahorros.sql, 002_ahorros_metodo_redondeo.sql, 003_ahorro_programado.sql, 004_ahorro_fondo.sql
 Dockerfile, .dockerignore, bd.env.example   # despliegue y configuración
 backend/requirements.txt (versiones fijas, para ejecutar) y requirements-dev.txt (más pytest y httpx)
 ```
 
 ## Base de datos
 
-MySQL, base `asistente_financiero`, 16 tablas: `usuarios`, `deudas`, `ahorros`,
-`ahorro_programado`,
+MySQL, base `asistente_financiero`, 17 tablas: `usuarios`, `deudas`, `ahorros`,
+`ahorro_programado`, `ahorro_fondo`,
 `deuda_tarjeta`, `deuda_vehiculo`, `deuda_educativo`, `deuda_otro`,
 `compras_tarjeta`, `pagos_deuda`, `ingresos`, `gastos`, `categorias_gasto`,
 `metas_ahorro`, `aportes_meta`, `tipos_deuda`.
@@ -1136,7 +1136,7 @@ MySQL, base `asistente_financiero`, 16 tablas: `usuarios`, `deudas`, `ahorros`,
     `PROGRAMADO`, `ALCANCIA` u `OTRO`; subtipo; monto actual; moneda; meta
     opcional con nombre, monto y fecha objetivo; método de ahorro; estado). Es
     distinta de `metas_ahorro`, que guarda la meta anual principal que usa
-    `/analisis`. Tienen endpoint las categorías `OTRO`, `ALCANCIA` y `PROGRAMADO`. La alcancía
+    `/analisis`. Tienen endpoint las categorías `OTRO`, `ALCANCIA`, `PROGRAMADO` y `FONDO_INVERSION`. La alcancía
     siempre es una meta (monto objetivo obligatorio), su "aporte inicial" es el
     monto actual y puede superar el objetivo (progreso 100%, igual que en
     "Otro") y su subtipo es el propósito (`META_PERSONALIZADA`,
@@ -1153,6 +1153,17 @@ MySQL, base `asistente_financiero`, 16 tablas: `usuarios`, `deudas`, `ahorros`,
     periodicidad, inicio) va en la tabla de detalle `ahorro_programado`, 1:1
     con `ahorros`; `AhorroOut` lo trae plano y nulo en las otras categorías.
     El diseño no pide moneda: es siempre `COP`.
+    El **fondo de inversión** (`POST /ahorros/fondo-inversion`) no es una meta:
+    entidad (obligatoria), tipo de fondo (es el subtipo: `RENTA_FIJA`,
+    `RENTA_VARIABLE`, `MIXTO`, `OTRO`), nombre, monto inicial (> 0, es el monto
+    actual), moneda (`COP` por defecto), fecha de inversión (hoy o anterior: es
+    dinero ya invertido), plazo sugerido opcional (`CORTO`, `MEDIANO`, `LARGO`),
+    tasa de rendimiento esperada E.A. (de 0 a 100, a 4 decimales), tipo de
+    rentabilidad (`FIJA` o `VARIABLE`) y reinversión automática (sí/no). Su
+    método queda en `MANUAL`. Lo propio va en la tabla de detalle `ahorro_fondo`
+    (1:1 con `ahorros`) y `AhorroOut` lo trae plano: `entidad`,
+    `tasa_rendimiento`, `tipo_rentabilidad`, `reinversion`, `plazo_sugerido` y
+    `fecha_inversion` (nulos en las demás categorías).
 -   **Cómo agregar una categoría de ahorro (backend):** un esquema de entrada
     en `schemas/ahorro.py`, un validador en `services/ahorros.py` (usa
     `_nombre_requerido`, `_exigir_fecha_no_pasada` y `_columnas`; sus
@@ -1161,19 +1172,21 @@ MySQL, base `asistente_financiero`, 16 tablas: `usuarios`, `deudas`, `ahorros`,
     (servicio): el endpoint `POST /ahorros/<categoria>` se genera solo y
     `test_contrato_ahorros.py` comprueba que esquema y validador coinciden.
     **Decisión de modelo de datos** (confirmada con el ahorro programado, la
-    primera categoría con datos propios; cuenta, CDT y fondo la siguen): lo
+    primera categoría con datos propios; el fondo ya usa `ahorro_fondo` y cuenta y CDT
+    la siguen): lo
     propio de cada categoría va en una tabla de detalle 1:1
     (`ahorro_programado`, `ahorro_cdt`, ...), como `DETALLE_POR_TIPO` en las
     deudas, y no en
     columnas nuevas de `ahorros`, que queda con lo común. Cada método de
     ahorro nuevo exige un `ALTER ... MODIFY ENUM` (migración). La llave del
     registro es el segmento de la ruta (`ahorro-programado`); el detalle viaja
-    en `columnas["programado"]` y `registrar_ahorro` lo guarda con el ahorro.
+    en `columnas["programado"]` o `columnas["fondo"]` (`DETALLE_POR_CLAVE`, la
+    misma llave que el atributo de `Ahorro`) y `registrar_ahorro` lo guarda con el ahorro.
 -   **Base que ya tiene datos (p. ej. Aiven):** nunca ejecutar `db/schema.sql`
     (borra las tablas); aplicar solo `db/migraciones/*.sql` en orden.
 -   **Crear una base nueva:** `db/schema.sql` (estructura con todas las
     restricciones) y luego `db/seed.sql` (catálogos); verificado sobre una
-    base vacía: 16 tablas, 8 tipos de deuda y 8 categorías. Si la
+    base vacía: 17 tablas, 8 tipos de deuda y 8 categorías. Si la
     estructura cambia, se regeneran con `mysqldump --no-data` (ver cómo en
     el historial del proyecto) y se actualizan los modelos a mano.
 
@@ -1193,6 +1206,7 @@ MySQL, base `asistente_financiero`, 16 tablas: `usuarios`, `deudas`, `ahorros`,
 | POST | `/ahorros/otro` | Registrar un ahorro de la categoría "Otro tipo de ahorro" |
 | POST | `/ahorros/alcancia` | Registrar una alcancía (meta con monto objetivo y aporte inicial opcional) |
 | POST | `/ahorros/ahorro-programado` | Registrar un ahorro programado (meta con monto por periodo, periodicidad y fechas de inicio y objetivo) |
+| POST | `/ahorros/fondo-inversion` | Registrar un fondo de inversión (entidad, tipo de fondo, monto inicial, rendimiento esperado, reinversión y plazo sugerido) |
 | DELETE | `/ahorros/{id}` | Eliminar ahorro |
 | GET/PUT | `/perfil` | Ingresos, gastos y datos familiares |
 | GET/PUT | `/meta-ahorro` | Meta de ahorro |
@@ -1327,7 +1341,7 @@ contraseña incorrectos".
 
 | Pantalla | Contenido |
 |----------|-----------|
-| Registrar ahorro | Seis categorías (cuenta de ahorro, CDT, fondo de inversión, ahorro programado, alcancía y otro). **"Otro", "Alcancía" y "Ahorro programado" tienen flujo**; las otras tres muestran "Próximamente" |
+| Registrar ahorro | Seis categorías (cuenta de ahorro, CDT, fondo de inversión, ahorro programado, alcancía y otro). **"Otro", "Alcancía", "Ahorro programado" y "Fondo de inversión" tienen flujo**; las otras dos muestran "Próximamente" |
 | Otro tipo de ahorro (paso 1) | Ocho subtipos: efectivo, dólares, plan de ahorro, pensión voluntaria, viaje, vivienda, emergencias y personalizado |
 | Registrar otro ahorro (paso 2) | Nombre, descripción (200), monto actual, moneda (COP, USD, EUR) y "¿Es una meta de ahorro?" |
 | Registrar otro ahorro (paso 3) | Si es meta: nombre, monto objetivo y fecha objetivo (opcional); método de ahorro (manual, programado, automático) |
@@ -1371,6 +1385,25 @@ estimado sale de las fechas (como en el diseño), no de dividir el total
 entre el monto por periodo. El código está en `ui/ahorro/Programado.kt`,
 `PasosProgramado.kt`, `ConfirmarProgramadoScreen.kt` y `ListaProgramado.kt`.
 
+### Registrar fondo de inversión
+
+Mismo punto de entrada ("Registrar ahorro" -> "Fondo de inversión"): entidad
+(lista con buscador y "Otra entidad": Bancolombia, Davivienda, BBVA, Banco de
+Bogotá, Fiducuenta, Skandia, Porvenir) -> información básica (nombre del fondo,
+tipo de fondo, monto inicial, moneda, fecha de inversión —arranca en hoy— y
+plazo sugerido opcional) -> rendimiento y condiciones (tasa esperada E.A., tipo
+de rentabilidad, reinversión automática con interruptor y descripción) ->
+confirmar ("Guardar") -> guardado -> éxito. En las listas la fila muestra el
+nombre, la entidad y el monto, sin barra ni lado derecho. El detalle abre con
+el monto actual y sigue con tipo de fondo, rendimiento esperado, tipo de
+rentabilidad, fecha de inversión, plazo sugerido y reinversión, y trae tres
+acciones ("Ver rendimiento", "Agregar aporte" y "Retirar dinero", aún
+"Próximamente"; el lápiz es "Editar"). El paso de elegir entidad es
+`ui/deuda/PasoEntidad.kt` (`PasoEntidadScreen`), compartido con la tarjeta de
+crédito: cada flujo le pasa su lista y su estado; con 8 filas o menos la lista
+no lleva scroll propio. El código del fondo está en `ui/ahorro/Fondo.kt`,
+`PasosFondo.kt` y `ConfirmarFondoScreen.kt`.
+
 **Estructura que comparten los flujos de ahorro** (para que una categoría
 nueva no copie código):
 
@@ -1380,7 +1413,7 @@ nueva no copie código):
 -   `CategoriasAhorro.kt`: `CategoriaAhorroUi` por categoría (icono,
     subtítulos de lista y detalle, textos del detalle, si el detalle abre con
     el progreso, cómo se llama cada método, el lado derecho de la fila en las
-    listas y las filas propias del detalle). Las pantallas le preguntan a la categoría, no preguntan
+    listas, las filas propias del detalle, si el detalle es solo filas y sus botones de acción). Las pantallas le preguntan a la categoría, no preguntan
     "¿es alcancía?"; una categoría que la app no conoce se muestra con lo
     básico.
 -   `RegistroAhorroFlow.kt`: `FLUJOS_AHORRO` (qué pasos recorre cada
@@ -1469,15 +1502,15 @@ ui/theme/        # colores y tipografía
 
 # 44. Pruebas
 
--   Backend: 362 pruebas de pytest (`backend/tests`): servicios de
+-   Backend: 398 pruebas de pytest (`backend/tests`): servicios de
     deudas, endpoints, registro, login, aislamiento por usuario y
     `test_registro_por_tipo.py`, que prueba los ocho tipos de deuda con los
     mismos casos (registro, saldo/cuotas/fechas inválidas, inactiva, borrado,
     aislamiento) y `test_mensajes_validadores.py`, que fija el texto exacto de
     cada error de validación (la app los muestra tal cual: cualquier cambio en
     los validadores debe mantenerlos).
--   App: 160 pruebas unitarias (`app/src/test`): validaciones, formularios
-    (hipotecario, tarjeta, vehículo, educación, otros, ahorro, alcancía, ahorro programado), contratos JSON
+-   App: 175 pruebas unitarias (`app/src/test`): validaciones, formularios
+    (hipotecario, tarjeta, vehículo, educación, otros, ahorro, alcancía, ahorro programado, fondo de inversión), contratos JSON
     con el backend, repositorios, formatos de moneda y fecha.
 -   Verificación visual: emulador `Medium_Phone` y celular Xiaomi
     (instalación vía USB). Cada flujo nuevo se recorre completo hasta
@@ -1514,13 +1547,14 @@ ui/theme/        # colores y tipografía
     Mientras no exista, el APK apunta a `127.0.0.1` y solo funciona con el
     backend del propio PC.
 -   **Ahorros**: falta el endpoint y el flujo de las otras categorías (cuenta
-    de ahorro, CDT y fondo de inversión), "Agregar
+    de ahorro y CDT), "Agregar
     aporte" y "Editar" del detalle (la tabla `aportes_meta` hoy cuelga de
     `metas_ahorro`, no de `ahorros`). **Antes de usar `/ahorros` en el servidor
     compartido hay que aplicar en Aiven `db/migraciones/001_ahorros.sql` (ya
     incluye el método `REDONDEO`; `002` solo es para bases donde se aplicó
-    una versión anterior de `001`) y `003_ahorro_programado.sql` (tabla del
-    ahorro programado y método `RECORDATORIO`), y desplegar de nuevo la API
+    una versión anterior de `001`) `003_ahorro_programado.sql` (tabla del
+    ahorro programado y método `RECORDATORIO`) y `004_ahorro_fondo.sql` (tabla del
+    fondo de inversión), y desplegar de nuevo la API
     en Render.**
     La app tolera un servidor sin `/ahorros`: el Inicio muestra todo menos
     los ahorros.

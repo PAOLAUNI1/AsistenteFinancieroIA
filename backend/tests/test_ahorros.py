@@ -436,3 +436,159 @@ def test_eliminar_un_ahorro_programado_borra_tambien_su_detalle(client, usuario_
     assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
 
     assert detalles() == 0
+
+
+# -------------------------------------------------------- fondo de inversión
+
+FONDO = {
+    "subtipo": "RENTA_FIJA",
+    "entidad": "Bancolombia",
+    "nombre": "Fondo Renta Fija Conservador",
+    "descripcion": "Fondo conservador para mediano plazo, ahorros vivienda.",
+    "monto_inicial": 3_000_000,
+    "moneda": "COP",
+    "fecha_inversion": "2026-08-15",
+    "plazo_sugerido": "MEDIANO",
+    "tasa_rendimiento": 8.5,
+    "tipo_rentabilidad": "VARIABLE",
+    "reinversion": True,
+}
+
+
+def _fondo(client, usuario_id, cuerpo):
+    return client.post("/ahorros/fondo-inversion", params={"usuario_id": usuario_id}, json=cuerpo)
+
+
+def test_un_fondo_se_registra_con_su_detalle_y_sin_meta(client, usuario_id):
+    respuesta = _fondo(client, usuario_id, FONDO)
+
+    assert respuesta.status_code == 201, respuesta.text
+    ahorro = respuesta.json()
+    assert ahorro["categoria"] == "FONDO_INVERSION"
+    assert ahorro["subtipo"] == "RENTA_FIJA"
+    assert ahorro["nombre"] == "Fondo Renta Fija Conservador"
+    assert ahorro["monto_actual"] == 3_000_000
+    assert ahorro["moneda"] == "COP"
+    assert ahorro["estado"] == "ACTIVA"
+    assert ahorro["es_meta"] is False
+    assert ahorro["monto_objetivo"] is None
+    assert ahorro["progreso"] is None
+    assert ahorro["entidad"] == "Bancolombia"
+    assert ahorro["tasa_rendimiento"] == 8.5
+    assert ahorro["tipo_rentabilidad"] == "VARIABLE"
+    assert ahorro["reinversion"] is True
+    assert ahorro["plazo_sugerido"] == "MEDIANO"
+    assert ahorro["fecha_inversion"] == "2026-08-15"
+
+
+def test_el_plazo_la_descripcion_y_la_reinversion_son_opcionales(client, usuario_id):
+    cuerpo = {k: v for k, v in FONDO.items() if k not in ("plazo_sugerido", "descripcion", "reinversion")}
+
+    ahorro = _fondo(client, usuario_id, cuerpo).json()
+
+    assert ahorro["plazo_sugerido"] is None
+    assert ahorro["descripcion"] is None
+    assert ahorro["reinversion"] is False
+
+
+def test_el_detalle_del_fondo_vuelve_en_el_listado_y_no_en_las_otras_categorias(client, usuario_id):
+    _fondo(client, usuario_id, FONDO)
+    _registrar(client, usuario_id, BASICO)
+
+    por_categoria = {
+        a["categoria"]: a for a in client.get("/ahorros", params={"usuario_id": usuario_id}).json()
+    }
+
+    assert por_categoria["FONDO_INVERSION"]["entidad"] == "Bancolombia"
+    assert por_categoria["OTRO"]["entidad"] is None
+    assert por_categoria["OTRO"]["tasa_rendimiento"] is None
+    assert por_categoria["OTRO"]["reinversion"] is None
+    assert por_categoria["OTRO"]["fecha_inversion"] is None
+
+
+@pytest.mark.parametrize("subtipo", ["RENTA_FIJA", "RENTA_VARIABLE", "MIXTO", "OTRO"])
+def test_se_aceptan_los_tipos_de_fondo(client, usuario_id, subtipo):
+    assert _fondo(client, usuario_id, {**FONDO, "subtipo": subtipo}).status_code == 201
+
+
+@pytest.mark.parametrize("plazo", ["CORTO", "MEDIANO", "LARGO"])
+def test_se_aceptan_los_tres_plazos(client, usuario_id, plazo):
+    respuesta = _fondo(client, usuario_id, {**FONDO, "plazo_sugerido": plazo})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["plazo_sugerido"] == plazo
+
+
+def test_la_fecha_de_inversion_puede_ser_hoy_o_pasada(client, usuario_id):
+    assert _fondo(client, usuario_id, {**FONDO, "fecha_inversion": date.today().isoformat()}).status_code == 201
+    assert _fondo(client, usuario_id, {**FONDO, "fecha_inversion": "2020-01-01"}).status_code == 201
+
+
+def test_la_tasa_cero_es_valida_y_se_redondea_a_cuatro_decimales(client, usuario_id):
+    assert _fondo(client, usuario_id, {**FONDO, "tasa_rendimiento": 0}).status_code == 201
+    assert _fondo(client, usuario_id, {**FONDO, "tasa_rendimiento": 7.123456}).json()["tasa_rendimiento"] == 7.1235
+
+
+@pytest.mark.parametrize(
+    "cambios,mensaje",
+    [
+        ({"entidad": "  "}, "Selecciona la entidad financiera."),
+        ({"nombre": "  "}, "Ingresa el nombre del fondo."),
+        (
+            {"fecha_inversion": (date.today() + timedelta(days=3)).isoformat()},
+            "La fecha de inversión no puede ser posterior a hoy.",
+        ),
+    ],
+)
+def test_las_reglas_del_fondo_dan_422_con_su_mensaje(client, usuario_id, cambios, mensaje):
+    respuesta = _fondo(client, usuario_id, {**FONDO, **cambios})
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["detail"] == mensaje
+
+
+@pytest.mark.parametrize(
+    "cambios",
+    [
+        {"subtipo": "VIAJES"},
+        {"monto_inicial": 0},
+        {"monto_inicial": -1},
+        {"tasa_rendimiento": -0.1},
+        {"tasa_rendimiento": 100.5},
+        {"tipo_rentabilidad": "MIXTA"},
+        {"plazo_sugerido": "ETERNO"},
+        {"moneda": "XXX"},
+        {"entidad": "x" * 101},
+        {"nombre": "x" * 101},
+        {"descripcion": "x" * 201},
+        {"fecha_inversion": "no es fecha"},
+    ],
+)
+def test_datos_fuera_de_rango_del_fondo_dan_422(client, usuario_id, cambios):
+    assert _fondo(client, usuario_id, {**FONDO, **cambios}).status_code == 422
+
+
+@pytest.mark.parametrize("campo", ["entidad", "nombre", "monto_inicial", "fecha_inversion", "tasa_rendimiento"])
+def test_los_campos_obligatorios_del_fondo(client, usuario_id, campo):
+    cuerpo = {k: v for k, v in FONDO.items() if k != campo}
+
+    assert _fondo(client, usuario_id, cuerpo).status_code == 422
+
+
+def test_registrar_un_fondo_sin_token_responde_401(client):
+    assert client.post("/ahorros/fondo-inversion", json=FONDO).status_code == 401
+
+
+def test_eliminar_un_fondo_borra_tambien_su_detalle(client, usuario_id):
+    from backend.models import AhorroFondo
+
+    def detalles():
+        with client.session_factory() as db:
+            return db.query(AhorroFondo).count()
+
+    id_ahorro = _fondo(client, usuario_id, FONDO).json()["id"]
+    assert detalles() == 1
+
+    assert client.delete(f"/ahorros/{id_ahorro}", params={"usuario_id": usuario_id}).status_code == 204
+
+    assert detalles() == 0

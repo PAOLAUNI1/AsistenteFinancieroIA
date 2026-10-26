@@ -10,7 +10,7 @@ from datetime import date
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.models import Ahorro, AhorroProgramado
+from backend.models import Ahorro, AhorroFondo, AhorroProgramado
 from backend.tiempo import hoy_colombia
 
 logger = logging.getLogger(__name__)
@@ -168,22 +168,64 @@ def validar_ahorro_programado(
     return columnas
 
 
+def validar_ahorro_fondo(
+    *,
+    subtipo: str,
+    entidad: str,
+    nombre: str,
+    descripcion: str | None,
+    monto_inicial: float,
+    moneda: str,
+    fecha_inversion: date,
+    plazo_sugerido: str | None,
+    tasa_rendimiento: float,
+    tipo_rentabilidad: str,
+    reinversion: bool,
+) -> dict:
+    """Columnas de `ahorros` más el detalle `fondo` (no es una meta: el monto inicial es el monto actual)."""
+    entidad = _nombre_requerido(entidad, "Selecciona la entidad financiera.")
+    nombre = _nombre_requerido(nombre, "Ingresa el nombre del fondo.")
+    if monto_inicial <= 0:
+        raise ValueError("Ingresa el monto inicial del fondo.")
+    if fecha_inversion > hoy_colombia():
+        raise ValueError("La fecha de inversión no puede ser posterior a hoy.")
+
+    columnas = _columnas(
+        categoria="FONDO_INVERSION", subtipo=subtipo, nombre=nombre, descripcion=descripcion,
+        monto_actual=monto_inicial, moneda=moneda, metodo="MANUAL",
+    )
+    columnas["fondo"] = {
+        "entidad": entidad,
+        "tasa_rendimiento": tasa_rendimiento,
+        "tipo_rentabilidad": tipo_rentabilidad,
+        "reinversion": reinversion,
+        "plazo_sugerido": plazo_sugerido,
+        "fecha_inversion": fecha_inversion,
+    }
+    return columnas
+
+
 # Cómo se valida cada categoría; las llaves son las del segmento de la ruta POST /ahorros/<categoria>
 # y las mismas que `routers/ahorros.ESQUEMAS_POR_CATEGORIA` (que dice qué cuerpo recibe cada una).
 VALIDADORES_POR_CATEGORIA = {
     "otro": validar_ahorro_otro,
     "alcancia": validar_ahorro_alcancia,
     "ahorro-programado": validar_ahorro_programado,
+    "fondo-inversion": validar_ahorro_fondo,
 }
+
+# Detalle 1:1 que guarda cada categoría que lo tiene: la llave es la de `columnas` y la del
+# atributo de `Ahorro` que lo relaciona.
+DETALLE_POR_CLAVE = {"programado": AhorroProgramado, "fondo": AhorroFondo}
 
 
 def registrar_ahorro(db: Session, usuario_id: int, columnas: dict) -> Ahorro:
     # Lo que va a la tabla de detalle de la categoría viaja aparte de las columnas de `ahorros`.
     columnas = dict(columnas)
-    detalle_programado = columnas.pop("programado", None)
+    detalles = {clave: columnas.pop(clave) for clave in DETALLE_POR_CLAVE if clave in columnas}
     ahorro = Ahorro(usuario_id=usuario_id, **columnas)
-    if detalle_programado is not None:
-        ahorro.programado = AhorroProgramado(**detalle_programado)
+    for clave, datos in detalles.items():
+        setattr(ahorro, clave, DETALLE_POR_CLAVE[clave](**datos))
     try:
         db.add(ahorro)
         db.commit()

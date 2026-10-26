@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from backend.schemas.comunes import MontoNoNegativo, MontoPositivo
+from backend.schemas.comunes import MontoNoNegativo, MontoPositivo, TasaNoNegativa
 
 # Subtipos del flujo "Otro tipo de ahorro" (pantalla 3 del diseño).
 SubtipoOtro = Literal[
@@ -22,6 +22,10 @@ MetodoAlcancia = Literal["MANUAL", "PROGRAMADO", "REDONDEO", "AUTOMATICO"]
 # El ahorro programado se cumple con una transferencia automática o con un recordatorio.
 MetodoProgramado = Literal["AUTOMATICO", "RECORDATORIO"]
 PeriodicidadAhorro = Literal["SEMANAL", "QUINCENAL", "MENSUAL"]
+# Subtipos de fondo de inversión: el tipo de fondo (pantalla de información básica del diseño).
+SubtipoFondo = Literal["RENTA_FIJA", "RENTA_VARIABLE", "MIXTO", "OTRO"]
+PlazoFondo = Literal["CORTO", "MEDIANO", "LARGO"]
+TipoRentabilidad = Literal["FIJA", "VARIABLE"]
 
 
 class AhorroOtroIn(BaseModel):
@@ -66,6 +70,23 @@ class AhorroProgramadoIn(BaseModel):
     metodo: MetodoProgramado = "AUTOMATICO"
 
 
+class AhorroFondoIn(BaseModel):
+    # El tipo de fondo es el subtipo del ahorro.
+    subtipo: SubtipoFondo
+    entidad: str = Field(max_length=100)
+    nombre: str = Field(max_length=100)
+    descripcion: str | None = Field(default=None, max_length=200)
+    # Con cuánto se entra al fondo (será el monto actual).
+    monto_inicial: MontoPositivo
+    moneda: Moneda = "COP"
+    fecha_inversion: date
+    plazo_sugerido: PlazoFondo | None = None
+    # Tasa de rendimiento esperada, efectiva anual (porcentaje).
+    tasa_rendimiento: TasaNoNegativa
+    tipo_rentabilidad: TipoRentabilidad = "VARIABLE"
+    reinversion: bool = False
+
+
 class AhorroOut(BaseModel):
     # Se arma directo desde el modelo SQLAlchemy (los Decimal de MySQL pasan a float).
     model_config = ConfigDict(from_attributes=True)
@@ -88,6 +109,13 @@ class AhorroOut(BaseModel):
     monto_periodo: float | None = None
     periodicidad: str | None = None
     fecha_inicio: date | None = None
+    # Solo en los fondos de inversión.
+    entidad: str | None = None
+    tasa_rendimiento: float | None = None
+    tipo_rentabilidad: str | None = None
+    reinversion: bool | None = None
+    plazo_sugerido: str | None = None
+    fecha_inversion: date | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

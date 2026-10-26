@@ -1,27 +1,20 @@
 from datetime import date
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import BaseModel, Field
 
-from backend.schemas.comunes import MAX_MONTO, MontoNoNegativo, MontoPositivo  # noqa: F401  (se reexportan)
+from backend.schemas.comunes import (  # noqa: F401  (se reexportan)
+    MAX_MONTO,
+    MAX_TASA,
+    MontoNoNegativo,
+    MontoPositivo,
+    TasaNoNegativa,
+    TasaPositiva,
+)
 
 # Límites alineados con las columnas de MySQL (decimal(7,4), varchar, ...) para que un dato
-# fuera de rango dé 422 y no un error de base de datos. Los montos están en schemas/comunes.py.
-MAX_TASA = 100.0
+# fuera de rango dé 422 y no un error de base de datos. Los montos y las tasas están en schemas/comunes.py.
 MAX_ANOS = 40
-
-
-def _a_cuatro_decimales(valor: float) -> float:
-    # La columna guarda 4 decimales: una tasa como 0,00001 quedaría en 0 con "intereses".
-    return round(valor, 4)
-
-
-TasaPositiva = Annotated[
-    float, AfterValidator(_a_cuatro_decimales), Field(gt=0, le=MAX_TASA, allow_inf_nan=False)
-]
-TasaNoNegativa = Annotated[
-    float, AfterValidator(_a_cuatro_decimales), Field(ge=0, le=MAX_TASA, allow_inf_nan=False)
-]
 
 PeriodicidadTasa = Literal["EA", "MENSUAL"]
 TipoTasa = Literal["FIJA", "VARIABLE"]

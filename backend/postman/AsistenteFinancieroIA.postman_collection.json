@@ -634,6 +634,55 @@
           }
         },
         {
+          "name": "Registrar - Fondo de inversión",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('ahorro_id', pm.response.json().id);",
+                  "}",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Categoría FONDO_INVERSION con su detalle, sin meta', () => {",
+                  "    const ahorro = pm.response.json();",
+                  "    pm.expect(ahorro.categoria).to.eql('FONDO_INVERSION');",
+                  "    pm.expect(ahorro.es_meta).to.eql(false);",
+                  "    pm.expect(ahorro.monto_actual).to.eql(3000000);",
+                  "    pm.expect(ahorro.entidad).to.eql('Bancolombia');",
+                  "    pm.expect(ahorro.tasa_rendimiento).to.eql(8.5);",
+                  "    pm.expect(ahorro.reinversion).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ahorros/fondo-inversion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ahorros",
+                "fondo-inversion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subtipo\": \"RENTA_FIJA\",\n  \"entidad\": \"Bancolombia\",\n  \"nombre\": \"Fondo Renta Fija Conservador\",\n  \"descripcion\": \"Fondo conservador para mediano plazo, ahorros vivienda.\",\n  \"monto_inicial\": 3000000,\n  \"moneda\": \"COP\",\n  \"fecha_inversion\": \"2026-08-15\",\n  \"plazo_sugerido\": \"MEDIANO\",\n  \"tasa_rendimiento\": 8.5,\n  \"tipo_rentabilidad\": \"VARIABLE\",\n  \"reinversion\": true\n}"
+            }
+          }
+        },
+        {
           "name": "Eliminar ahorro (usa ahorro_id del último creado)",
           "event": [
             {

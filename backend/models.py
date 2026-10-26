@@ -311,6 +311,10 @@ class Ahorro(Base):
     programado: Mapped["AhorroProgramado | None"] = relationship(
         lazy="joined", uselist=False, cascade="all, delete-orphan"
     )
+    # Detalle 1:1 de la categoría FONDO_INVERSION.
+    fondo: Mapped["AhorroFondo | None"] = relationship(
+        lazy="joined", uselist=False, cascade="all, delete-orphan"
+    )
 
     # Lo propio del ahorro programado, expuesto como atributos del ahorro (AhorroOut lo lee directo).
     @property
@@ -324,6 +328,31 @@ class Ahorro(Base):
     @property
     def fecha_inicio(self) -> date | None:
         return self.programado.fecha_inicio if self.programado else None
+
+    # Lo propio del fondo de inversión, igual que lo del ahorro programado.
+    @property
+    def entidad(self) -> str | None:
+        return self.fondo.entidad if self.fondo else None
+
+    @property
+    def tasa_rendimiento(self) -> float | None:
+        return self.fondo.tasa_rendimiento if self.fondo else None
+
+    @property
+    def tipo_rentabilidad(self) -> str | None:
+        return self.fondo.tipo_rentabilidad if self.fondo else None
+
+    @property
+    def reinversion(self) -> bool | None:
+        return self.fondo.reinversion if self.fondo else None
+
+    @property
+    def plazo_sugerido(self) -> str | None:
+        return self.fondo.plazo_sugerido if self.fondo else None
+
+    @property
+    def fecha_inversion(self) -> date | None:
+        return self.fondo.fecha_inversion if self.fondo else None
 
 
 class AhorroProgramado(Base):
@@ -342,6 +371,28 @@ class AhorroProgramado(Base):
         Enum("SEMANAL", "QUINCENAL", "MENSUAL", name="periodicidad_ahorro"), nullable=False
     )
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class AhorroFondo(Base):
+    """Detalle 1:1 para ahorros de categoría FONDO_INVERSION (el tipo de fondo es el subtipo del ahorro)."""
+
+    __tablename__ = "ahorro_fondo"
+
+    ahorro_id: Mapped[int] = mapped_column(
+        Integer().with_variant(mysql.INTEGER(unsigned=True), "mysql"),
+        ForeignKey("ahorros.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    entidad: Mapped[str] = mapped_column(String(100), nullable=False)
+    tasa_rendimiento: Mapped[float] = mapped_column(Numeric(7, 4), nullable=False)
+    tipo_rentabilidad: Mapped[str] = mapped_column(
+        Enum("FIJA", "VARIABLE", name="tipo_rentabilidad"), nullable=False
+    )
+    reinversion: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    plazo_sugerido: Mapped[str | None] = mapped_column(
+        Enum("CORTO", "MEDIANO", "LARGO", name="plazo_fondo"), nullable=True
+    )
+    fecha_inversion: Mapped[date] = mapped_column(Date, nullable=False)
 
 
 # Tabla de detalle 1:1 por código de tipo de deuda (los tipos que no están aquí

@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.deps import usuario_actual
 from backend.models import Usuario
-from backend.schemas.ahorro import AhorroAlcanciaIn, AhorroOtroIn, AhorroOut, AhorroProgramadoIn
+from backend.schemas.ahorro import (
+    AhorroAlcanciaIn,
+    AhorroFondoIn,
+    AhorroOtroIn,
+    AhorroOut,
+    AhorroProgramadoIn,
+)
 from backend.services import ahorros as servicio
 
 router = APIRouter(prefix="/ahorros", tags=["ahorros"])
@@ -15,6 +21,7 @@ ESQUEMAS_POR_CATEGORIA = {
     "otro": AhorroOtroIn,
     "alcancia": AhorroAlcanciaIn,
     "ahorro-programado": AhorroProgramadoIn,
+    "fondo-inversion": AhorroFondoIn,
 }
 
 

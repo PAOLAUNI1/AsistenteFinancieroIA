@@ -16,6 +16,22 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+DROP TABLE IF EXISTS `ahorro_fondo`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ahorro_fondo` (
+  `ahorro_id` int unsigned NOT NULL,
+  `entidad` varchar(100) NOT NULL,
+  `tasa_rendimiento` decimal(7,4) NOT NULL COMMENT 'Rendimiento esperado, efectivo anual (%)',
+  `tipo_rentabilidad` enum('FIJA','VARIABLE') NOT NULL,
+  `reinversion` tinyint(1) NOT NULL DEFAULT '0',
+  `plazo_sugerido` enum('CORTO','MEDIANO','LARGO') DEFAULT NULL,
+  `fecha_inversion` date NOT NULL,
+  PRIMARY KEY (`ahorro_id`),
+  CONSTRAINT `fk_ahorro_fondo_ahorro` FOREIGN KEY (`ahorro_id`) REFERENCES `ahorros` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_ahorro_fondo_tasa` CHECK ((`tasa_rendimiento` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ahorro_programado`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
